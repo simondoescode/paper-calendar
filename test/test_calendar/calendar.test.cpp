@@ -16,6 +16,7 @@
 #include <cstdio>
 #include <fstream>
 #include <memory>
+#include <vector>
 
 namespace {
 
@@ -640,6 +641,74 @@ void test_host_provider_error_and_missing_configuration_are_clean(void) {
 }
 
 
+void test_footer_fits_long_labels_and_keeps_cards_above_status_bar() {
+  class CheckedDisplay : public calendar::HostDisplayTarget {
+  public:
+    CheckedDisplay() : HostDisplayTarget("footer-preview-test.png") {}
+    void text(uint16_t x, uint16_t y, const char *value, uint8_t font,
+              calendar::DisplayColor fg, calendar::DisplayColor bg) override {
+      if (y >= 448) {
+        TEST_ASSERT_EQUAL_UINT(calendar::kCalendarFontStatus, font);
+        TEST_ASSERT_TRUE(x >= 16 && x + textWidth(value, font) <= 784);
+        TEST_ASSERT_TRUE(y - fontHeight(font) > 448 && y + 5 < 480);
+        labels.emplace_back(value);
+      }
+      HostDisplayTarget::text(x, y, value, font, fg, bg);
+    }
+    void roundRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint8_t r,
+                   calendar::DisplayColor fill, calendar::DisplayColor border) override {
+      if (y < 448) TEST_ASSERT_TRUE(y + h <= 448);
+      HostDisplayTarget::roundRect(x, y, w, h, r, fill, border);
+    }
+    bool refresh() override { ++refreshes; return HostDisplayTarget::refresh(); }
+    std::vector<std::string> labels;
+    unsigned refreshes = 0;
+  } display;
+  const calendar::CalendarDate today = {2026, 10, 1};
+  calendar::MockCalendarProvider provider(today);
+  calendar::CalendarEvent events[calendar::kMaxEvents] = {};
+  const size_t count = provider.loadEvents(events, calendar::kMaxEvents);
+  calendar::FooterStatus footer;
+  footer.wifiLabel = "A very long home network name that must be truncated before reaching the right group";
+  footer.wifiConnected = true;
+  footer.lastUpdated = "18:42";
+  footer.batteryPercent = 72;
+  TEST_ASSERT_TRUE(calendar::renderCalendar(display, events, count, today, "test", "host", -1, parsedWeatherFixture(), footer));
+  TEST_ASSERT_EQUAL_UINT(1, display.refreshes);
+  TEST_ASSERT_EQUAL_UINT(4, display.labels.size());
+  TEST_ASSERT_EQUAL_STRING("6 events today", display.labels[0].c_str());
+  TEST_ASSERT_EQUAL_STRING("72%", display.labels[1].c_str());
+  TEST_ASSERT_NOT_NULL(strstr(display.labels[2].c_str(), "..."));
+  TEST_ASSERT_EQUAL_STRING("Last updated: 18:42", display.labels[3].c_str());
+  display.labels.clear();
+  footer.wifiLabel = nullptr;
+  footer.lastUpdated = nullptr;
+  footer.batteryPercent = -1;
+  footer.batteryTenthsVolts = 39;
+  TEST_ASSERT_TRUE(calendar::renderCalendar(display, nullptr, 0, today, "test", "host", 39, calendar::WeatherData{}, footer));
+  TEST_ASSERT_EQUAL_STRING("0 events today", display.labels[0].c_str());
+  TEST_ASSERT_EQUAL_STRING("3.9V", display.labels[1].c_str());
+  TEST_ASSERT_EQUAL_STRING("Last updated: --:--", display.labels[3].c_str());
+  display.labels.clear();
+  footer.todayEventCount = 1;
+  footer.batteryPercent = 200;
+  TEST_ASSERT_TRUE(calendar::renderCalendar(display, nullptr, 0, today, "test", "host", -1, calendar::WeatherData{}, footer));
+  TEST_ASSERT_EQUAL_STRING("1 event today", display.labels[0].c_str());
+  TEST_ASSERT_EQUAL_STRING("100%", display.labels[1].c_str());
+  remove("footer-preview-test.png");
+}
+
+void test_footer_display_hash_tracks_status_changes() {
+  calendar::FooterStatus footer;
+  const auto hash = calendar::footerDisplayHash(footer);
+  TEST_ASSERT_EQUAL_UINT32(hash, calendar::footerDisplayHash(footer));
+  footer.lastUpdated = "18:42";
+  TEST_ASSERT_NOT_EQUAL(hash, calendar::footerDisplayHash(footer));
+  const auto updatedHash = calendar::footerDisplayHash(footer);
+  footer.wifiConnected = true;
+  TEST_ASSERT_NOT_EQUAL(updatedHash, calendar::footerDisplayHash(footer));
+}
+
 void setUp(void) { setLondonTimezoneForTest(); }
 void tearDown(void) {}
 
@@ -676,5 +745,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_weather_hash_tracks_visible_values);
   RUN_TEST(test_weather_conditions_map_to_lucide_icons_with_cloud_fallback);
   RUN_TEST(test_host_provider_error_and_missing_configuration_are_clean);
+  RUN_TEST(test_footer_fits_long_labels_and_keeps_cards_above_status_bar);
+  RUN_TEST(test_footer_display_hash_tracks_status_changes);
   return UNITY_END();
 }

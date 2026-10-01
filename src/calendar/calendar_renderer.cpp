@@ -13,9 +13,17 @@ constexpr uint16_t kLeftColumnWidth = 560;
 constexpr uint16_t kRightColumnWidth = kDisplayWidth - kLeftColumnWidth;
 constexpr uint16_t kHeaderHeight = 112;
 constexpr uint16_t kOuterPadding = 16;
-constexpr uint16_t kCardGap = 12;
+constexpr uint16_t kCardGap = 10;
 constexpr uint16_t kTodayCardHeight = 72;
 constexpr uint8_t kCardRadius = 10;
+constexpr uint16_t kFooterHeight = 32;
+constexpr uint16_t kFooterTop = kDisplayHeight - kFooterHeight;
+constexpr uint16_t kFooterPadding = 16;
+constexpr uint16_t kFooterIconSize = 16;
+constexpr uint16_t kFooterIconGap = 7;
+constexpr uint16_t kFooterSeparatorGap = 12;
+constexpr uint16_t kFooterGroupGap = 24;
+constexpr uint8_t kFooterFont = kCalendarFontStatus;
 
 const char *const kWeekdayNames[] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
 const char *const kFullWeekdayNames[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
@@ -64,6 +72,7 @@ void fitText(DisplayTarget &display, const char *source, char *output, size_t ou
              uint8_t font, uint16_t maxWidth) {
   if (outputSize == 0) return;
   snprintf(output, outputSize, "%s", source == nullptr ? "" : source);
+  output[outputSize - 1] = '\0'; // Also terminate on native CRTs that truncate without a NUL.
   if (display.textWidth(output, font) <= maxWidth) return;
   size_t length = strlen(output);
   while (length > 0) {
@@ -120,7 +129,7 @@ void drawTodayCard(DisplayTarget &display, uint16_t y, const CalendarEvent &even
   }
 }
 
-void drawToday(DisplayTarget &display, const CalendarEvent *events, size_t count, CalendarDate date) {
+size_t drawToday(DisplayTarget &display, const CalendarEvent *events, size_t count, CalendarDate date) {
   const CalendarRange range = calendarTodayRange(date);
   CalendarEvent today[kMaxEvents];
   const size_t todayCount = selectEventsForRange(events, count, range, today, kMaxEvents);
@@ -128,7 +137,7 @@ void drawToday(DisplayTarget &display, const CalendarEvent *events, size_t count
     display.roundRect(kOuterPadding, 136, kLeftColumnWidth - 2 * kOuterPadding, 100, kCardRadius,
                       DisplayColor::White, DisplayColor::Black);
     display.text(40, 194, "No events today", kCalendarFontTitle);
-    return;
+    return 0;
   }
   const size_t visibleCount = todayCount < 5 ? todayCount : 4;
   uint16_t y = 128;
@@ -138,9 +147,11 @@ void drawToday(DisplayTarget &display, const CalendarEvent *events, size_t count
   }
   if (todayCount > visibleCount) {
     const uint16_t labelWidth = display.textWidth("More events...", kCalendarFontFooter);
-    display.text(static_cast<uint16_t>(kLeftColumnWidth - kOuterPadding - labelWidth), 469,
+    display.text(static_cast<uint16_t>(kLeftColumnWidth - kOuterPadding - labelWidth),
+                 baselineFromTop(display, 113, kCalendarFontFooter),
                  "More events...", kCalendarFontFooter);
   }
+  return todayCount;
 }
 
 void drawForecast(DisplayTarget &display, const WeatherData &weather) {
@@ -219,12 +230,86 @@ void drawLater(DisplayTarget &display, const CalendarEvent *events, size_t count
       localTimeFromEpoch(later[i].startEpoch, eventDate, hour, minute);
     }
     drawUpcomingCard(display, y, later[i], eventDate);
-    y = static_cast<uint16_t>(y + 98);
+    y = static_cast<uint16_t>(y + 96);
   }
   if (laterCount == 0) display.text(592, 211, "No upcoming events", kCalendarFontFooter,
                                     DisplayColor::Black, DisplayColor::LightGrey);
-  if (laterCount > visibleCount) display.text(706, 469, "More...", kCalendarFontFooter,
+  if (laterCount > visibleCount) display.text(706, baselineFromTop(display, 150, kCalendarFontFooter), "More...", kCalendarFontFooter,
                                                DisplayColor::Black, DisplayColor::LightGrey);
+}
+
+void drawWifiIcon(DisplayTarget &display, uint16_t x, uint16_t y, bool connected) {
+  const uint16_t outerX[] = {1, 4, 8, 12, 15};
+  const uint16_t outerY[] = {4, 2, 1, 2, 4};
+  const uint16_t innerX[] = {4, 6, 10, 12};
+  const uint16_t innerY[] = {8, 6, 6, 8};
+  for (size_t i = 1; i < 5; ++i) display.line(x + outerX[i-1], y + outerY[i-1], x + outerX[i], y + outerY[i]);
+  for (size_t i = 1; i < 4; ++i) display.line(x + innerX[i-1], y + innerY[i-1], x + innerX[i], y + innerY[i]);
+  display.circle(x + 8, y + 13, 1, DisplayColor::Black, true);
+  if (!connected) display.line(x, y, x + 15, y + 15);
+}
+
+void drawCalendarIcon(DisplayTarget &display, uint16_t x, uint16_t y) {
+  display.roundRect(x, y + 2, kFooterIconSize, 14, 1, DisplayColor::White, DisplayColor::Black);
+  display.line(x, y + 6, x + 15, y + 6);
+  display.line(x + 4, y, x + 4, y + 4);
+  display.line(x + 11, y, x + 11, y + 4);
+  display.fillRect(x + 4, y + 9, 2, 2, DisplayColor::Black);
+  display.fillRect(x + 9, y + 9, 2, 2, DisplayColor::Black);
+}
+
+void drawBatteryIcon(DisplayTarget &display, uint16_t x, uint16_t y, const FooterStatus &status) {
+  display.roundRect(x, y + 3, 14, 10, 1, DisplayColor::White, DisplayColor::Black);
+  display.fillRect(x + 14, y + 6, 2, 4, DisplayColor::Black);
+  if (status.batteryPercent >= 0) {
+    const int percent = status.batteryPercent > 100 ? 100 : status.batteryPercent;
+    const uint16_t fill = static_cast<uint16_t>(percent / 10);
+    if (fill) display.fillRect(x + 2, y + 5, fill, 6, DisplayColor::Black);
+  }
+}
+
+void drawFooter(DisplayTarget &display, const FooterStatus &status) {
+  display.fillRect(0, kFooterTop, kDisplayWidth, kFooterHeight, DisplayColor::White);
+  display.line(0, kFooterTop, kDisplayWidth - 1, kFooterTop);
+  const uint16_t centerY = kFooterTop + kFooterHeight / 2;
+  const uint16_t baseline = centerY + display.fontHeight(kFooterFont) / 2;
+  const uint16_t iconY = centerY - kFooterIconSize / 2;
+  char eventLabel[32];
+  char batteryLabel[16];
+  char updateLabel[32];
+  snprintf(eventLabel, sizeof(eventLabel), "%d event%s today", status.todayEventCount,
+           status.todayEventCount == 1 ? "" : "s");
+  if (status.batteryPercent >= 0) snprintf(batteryLabel, sizeof(batteryLabel), "%d%%", status.batteryPercent > 100 ? 100 : status.batteryPercent);
+  else if (status.batteryTenthsVolts >= 0) snprintf(batteryLabel, sizeof(batteryLabel), "%d.%dV",
+                                                  status.batteryTenthsVolts / 10, status.batteryTenthsVolts % 10);
+  else snprintf(batteryLabel, sizeof(batteryLabel), "--%%");
+  snprintf(updateLabel, sizeof(updateLabel), "Last updated: %.5s", status.lastUpdated ? status.lastUpdated : "--:--");
+  const uint16_t eventWidth = display.textWidth(eventLabel, kFooterFont);
+  const uint16_t batteryWidth = display.textWidth(batteryLabel, kFooterFont);
+  const uint16_t separatorWidth = kFooterSeparatorGap * 2;
+  const uint16_t rightWidth = 2 * (kFooterIconSize + kFooterIconGap) + eventWidth + separatorWidth + batteryWidth;
+  const uint16_t rightX = kDisplayWidth - kFooterPadding - rightWidth;
+  uint16_t x = rightX;
+  drawCalendarIcon(display, x, iconY);
+  x += kFooterIconSize + kFooterIconGap;
+  display.text(x, baseline, eventLabel, kFooterFont);
+  x += eventWidth + kFooterSeparatorGap;
+  display.circle(x, centerY, 1, DisplayColor::Black, true);
+  x += kFooterSeparatorGap;
+  drawBatteryIcon(display, x, iconY, status);
+  display.text(x + kFooterIconSize + kFooterIconGap, baseline, batteryLabel, kFooterFont);
+
+  x = kFooterPadding;
+  drawWifiIcon(display, x, iconY, status.wifiConnected);
+  x += kFooterIconSize + kFooterIconGap;
+  const uint16_t updateWidth = display.textWidth(updateLabel, kFooterFont);
+  const uint16_t networkBudget = rightX - kFooterGroupGap - x - separatorWidth - updateWidth;
+  char networkLabel[40];
+  fitText(display, status.wifiLabel, networkLabel, sizeof(networkLabel), kFooterFont, networkBudget);
+  display.text(x, baseline, networkLabel, kFooterFont);
+  x += display.textWidth(networkLabel, kFooterFont) + kFooterSeparatorGap;
+  display.circle(x, centerY, 1, DisplayColor::Black, true);
+  display.text(x + kFooterSeparatorGap, baseline, updateLabel, kFooterFont);
 }
 
 const char *statusHeading(DisplayStatus status) {
@@ -241,6 +326,21 @@ const char *statusHeading(DisplayStatus status) {
 
 } // namespace
 
+uint32_t footerDisplayHash(const FooterStatus &status) {
+  uint32_t hash = 2166136261UL;
+  const auto add = [&hash](const char *text, size_t limit) {
+    for (size_t i = 0; text && i < limit && text[i]; ++i) { hash ^= static_cast<uint8_t>(text[i]); hash *= 16777619UL; }
+    hash ^= 0; hash *= 16777619UL;
+  };
+  add(status.wifiLabel, 39);
+  add(status.lastUpdated, 5);
+  char values[64];
+  snprintf(values, sizeof(values), "%u/%d/%d/%d", status.wifiConnected, status.todayEventCount,
+           status.batteryPercent, status.batteryTenthsVolts);
+  add(values, sizeof(values));
+  return hash;
+}
+
 bool renderCalendar(DisplayTarget &display, const CalendarEvent *events, size_t eventCount, CalendarDate date,
                     const char *firmwareVersion, const char *deviceModel, int16_t batteryTenthsVolts) {
   return renderCalendar(display, events, eventCount, date, firmwareVersion, deviceModel, batteryTenthsVolts,
@@ -250,6 +350,15 @@ bool renderCalendar(DisplayTarget &display, const CalendarEvent *events, size_t 
 bool renderCalendar(DisplayTarget &display, const CalendarEvent *events, size_t eventCount, CalendarDate date,
                     const char *firmwareVersion, const char *deviceModel, int16_t batteryTenthsVolts,
                     const WeatherData &weather) {
+  FooterStatus footer;
+  footer.batteryTenthsVolts = batteryTenthsVolts;
+  return renderCalendar(display, events, eventCount, date, firmwareVersion, deviceModel, batteryTenthsVolts,
+                        weather, footer);
+}
+
+bool renderCalendar(DisplayTarget &display, const CalendarEvent *events, size_t eventCount, CalendarDate date,
+                    const char *firmwareVersion, const char *deviceModel, int16_t batteryTenthsVolts,
+                    const WeatherData &weather, const FooterStatus &footer) {
   (void)firmwareVersion;
   (void)deviceModel;
   (void)batteryTenthsVolts;
@@ -268,8 +377,11 @@ bool renderCalendar(DisplayTarget &display, const CalendarEvent *events, size_t 
   display.text(20, baselineFromTop(display, 46, kCalendarFontMain), weekday, kCalendarFontMain,
                DisplayColor::White, DisplayColor::Black);
   drawCurrentWeather(display, weather);
-  drawToday(display, events, eventCount, date);
+  const size_t todayCount = drawToday(display, events, eventCount, date);
   drawLater(display, events, eventCount, date, weather);
+  FooterStatus resolvedFooter = footer;
+  if (resolvedFooter.todayEventCount < 0) resolvedFooter.todayEventCount = static_cast<int>(todayCount);
+  drawFooter(display, resolvedFooter);
   return display.refresh();
 }
 

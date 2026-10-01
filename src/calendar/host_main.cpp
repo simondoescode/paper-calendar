@@ -74,7 +74,17 @@ void runLifecycle(calendar::ConfigStore &store, calendar::HostDisplayTarget &dis
     }
     printf("[weather] Offline demo fixture (not live weather).\n");
   }
-  if (!calendar::renderCalendar(display, events, count, today, "host-dev", "calendar-host", -1, weather)) {
+  calendar::FooterStatus footer;
+  footer.wifiLabel = "Home WiFi";
+  footer.wifiConnected = true;
+  footer.batteryPercent = 72; // Host demo only; firmware uses measured voltage.
+  char updated[6] = "--:--";
+  calendar::CalendarDate stampDate = {};
+  unsigned hour = 0, minute = 0;
+  if (calendar::localTimeFromEpoch(static_cast<int64_t>(time(nullptr)), stampDate, hour, minute))
+    snprintf(updated, sizeof(updated), "%02u:%02u", hour, minute);
+  footer.lastUpdated = updated;
+  if (!calendar::renderCalendar(display, events, count, today, "host-dev", "calendar-host", -1, weather, footer)) {
     fprintf(stderr, "Could not write calendar preview.\n");
   }
 }

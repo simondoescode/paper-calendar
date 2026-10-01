@@ -7,7 +7,11 @@ PreferencesPersistence preferencesPersistence(preferences);
 StoredLogs storedLogs(LOG_MAX_NOTES_NUMBER / 2, LOG_MAX_NOTES_NUMBER / 2, PREFERENCES_LOG_KEY,
                       PREFERENCES_LOG_BUFFER_HEAD_KEY, preferencesPersistence);
 RefreshInterval refreshInterval(preferencesPersistence);
+#if !defined(EINK_CALENDAR_APP)
+// Standalone calendar startup never uses the TRMNL updater. Avoid retaining
+// its 1 KiB URL buffer and constructor while preserving upstream OTA behavior.
 FirmwareUpdateService firmwareUpdateService(preferencesPersistence, systemClock(), WIFI_CONNECTION_RSSI);
+#endif
 
 // --- Image download / API state ---
 String new_filename = "";

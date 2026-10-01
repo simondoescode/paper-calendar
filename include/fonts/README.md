@@ -36,3 +36,7 @@ These are the measured capital heights (the baseline offset of `H`):
 The sidebar heading uses the 18 px bold font, with a 16 px fallback if its text
 exceeds the available width. The host uses the same compressed bitmaps and portable
 Group 5 decoder as the firmware; it does not substitute placeholder glyphs.
+
+The full-width status bar also uses `Manrope_Medium_8.h`, including its measured
+11 px capital height and glyph widths. It reuses the existing asset without
+adding another font size or family.

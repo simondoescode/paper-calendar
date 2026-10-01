@@ -729,6 +729,7 @@ static const uint8_t *display_calendar_font(uint8_t font_size)
     case calendar::kCalendarFontTitle: return Manrope_SemiBold_11;
     case calendar::kCalendarFontMetadata: return Manrope_Medium_10;
     case calendar::kCalendarFontFooter: return Manrope_Medium_8;
+    case calendar::kCalendarFontStatus: return Manrope_Medium_8;
     default: return Manrope_Medium_10;
     }
 }

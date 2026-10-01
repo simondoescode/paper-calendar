@@ -15,6 +15,8 @@ constexpr uint8_t kCalendarFontHeading = 18;
 constexpr uint8_t kCalendarFontTitle = 16;
 constexpr uint8_t kCalendarFontMetadata = 13;
 constexpr uint8_t kCalendarFontFooter = 11;
+// Status text shares the compact Manrope Medium bitmap used by the footer.
+constexpr uint8_t kCalendarFontStatus = 12;
 
 class DisplayTarget {
 public:

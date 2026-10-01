@@ -309,6 +309,7 @@ const uint8_t *hostCalendarFont(uint8_t size) {
   case kCalendarFontTitle: return Manrope_SemiBold_11;
   case kCalendarFontMetadata: return Manrope_Medium_10;
   case kCalendarFontFooter: return Manrope_Medium_8;
+  case kCalendarFontStatus: return Manrope_Medium_8;
   default: return Manrope_Medium_10;
   }
 }
@@ -348,7 +349,8 @@ void HostDisplayTarget::text(uint16_t x, uint16_t y, const char *value, uint8_t 
       const size_t fontBytes = size == kCalendarFontMain ? sizeof(Manrope_Bold_25)
           : size == kCalendarFontHeading ? sizeof(Manrope_Bold_13)
           : size == kCalendarFontTitle ? sizeof(Manrope_SemiBold_11)
-          : size == kCalendarFontFooter ? sizeof(Manrope_Medium_8) : sizeof(Manrope_Medium_10);
+          : size == kCalendarFontFooter ? sizeof(Manrope_Medium_8)
+          : size == kCalendarFontStatus ? sizeof(Manrope_Medium_8) : sizeof(Manrope_Medium_10);
       const size_t end = *character < last ? bitmapStart + fontWord(metrics + 8) : fontBytes;
       const size_t start = bitmapStart + offset;
       if (end <= start || end > fontBytes) continue;

@@ -69,6 +69,44 @@ the smaller right-hand column. It uses black and white only, bounded text
 buffers, truncation, and the existing e-paper drawing buffer. The UI does not
 keep a second full-screen bitmap in RAM.
 
+## Calendar footer
+
+The calendar has a 32 px white status bar across the bottom of the 800x480
+canvas, with a one-pixel black separator at y=448. The 560/240 main/sidebar
+split, card dimensions and weather structure remain intact. Main-card gaps
+are 10 px and sidebar-card gaps are 8 px, leaving all cards above the footer.
+Overflow indicators move into the small spaces above the cards.
+
+`FooterStatus` in `include/calendar/footer_status.h` passes values from the
+lifecycle adapter to the shared renderer. Footer drawing uses the existing
+compressed bitmap font renderer with compact Manrope Medium (`Manrope_Medium_8.h`).
+Wi-Fi, calendar and battery icons are line/rectangle/circle
+primitives; separator dots are filled circles. There is no new graphics
+library, framebuffer, network operation or heap allocation in footer drawing.
+
+The left group shows a generic **Home WiFi** label and the actual connection
+state, followed by local `Last updated: HH:MM`. The label is intentionally a
+placeholder rather than the saved SSID. The timestamp is prepared after
+calendar/weather retrieval, immediately before deciding whether to draw.
+It is part of the visible-state hash, so a changed displayed minute triggers
+a redraw even if events are unchanged. One render still performs one panel
+refresh. The same minute and otherwise unchanged visible state can still skip
+refreshing.
+
+The right group reports all current-day events in the bounded provider data,
+including events beyond the four visible cards. A supplied percentage is
+clamped to 0–100. Firmware uses the existing measured battery voltage because
+the ADC abstraction does not expose calibrated charge percentage; unknown
+battery/time values show `--%` / `--:--`. The host preview uses a clearly
+documented 72% battery mock and connected Wi-Fi state, plus actual local
+refresh time and fixture event count. Charging is reserved for future use.
+
+Text width and capital height come from the selected Manrope bitmap metrics.
+The right group is anchored to the right margin; a bounded, truncated Wi-Fi
+label prevents the left group from overlapping it. Tests cover long/null
+labels, event counts, voltage/percentage fallbacks, card boundaries and one
+refresh per render.
+
 ## Build and flash
 
 Build from the repository root:
