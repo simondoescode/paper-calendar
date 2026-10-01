@@ -14,11 +14,11 @@ degree marks as circles and does not require other glyphs.
 Generate the five headers with the existing utility:
 
 ```text
-fontconvert manrope-bold.ttf Manrope_Bold_35.h 35 32 126
-fontconvert manrope-bold.ttf Manrope_Bold_19.h 19 32 126
-fontconvert manrope-semibold.ttf Manrope_SemiBold_14.h 14 32 126
-fontconvert manrope-medium.ttf Manrope_Medium_11.h 11 32 126
+fontconvert manrope-bold.ttf Manrope_Bold_25.h 25 32 126
+fontconvert manrope-bold.ttf Manrope_Bold_13.h 13 32 126
+fontconvert manrope-semibold.ttf Manrope_SemiBold_11.h 11 32 126
 fontconvert manrope-medium.ttf Manrope_Medium_10.h 10 32 126
+fontconvert manrope-medium.ttf Manrope_Medium_8.h 8 32 126
 ```
 
 Point sizes are an input to `fontconvert`, not CSS pixel sizes. Use the glyph
@@ -27,12 +27,12 @@ These are the measured capital heights (the baseline offset of `H`):
 
 | UI role | Asset | Capital height |
 | --- | --- | ---: |
-| Main date/day | `Manrope_Bold_35.h` | 51 px |
-| Section heading / weather value | `Manrope_Bold_19.h` | 28 px |
-| Event title | `Manrope_SemiBold_14.h` | 20 px |
-| Event metadata | `Manrope_Medium_11.h` | 16 px |
-| Footer / status | `Manrope_Medium_10.h` | 13 px |
+| Main date/day | `Manrope_Bold_25.h` | 35 px |
+| Section heading / weather value | `Manrope_Bold_13.h` | 18 px |
+| Event title | `Manrope_SemiBold_11.h` | 16 px |
+| Event metadata | `Manrope_Medium_10.h` | 13 px |
+| Footer / status | `Manrope_Medium_8.h` | 11 px |
 
-The narrow sidebar heading uses the 20 px font when the 28 px heading exceeds
-its available width. The host uses the same compressed bitmaps and portable
+The sidebar heading uses the 18 px bold font, with a 16 px fallback if its text
+exceeds the available width. The host uses the same compressed bitmaps and portable
 Group 5 decoder as the firmware; it does not substitute placeholder glyphs.

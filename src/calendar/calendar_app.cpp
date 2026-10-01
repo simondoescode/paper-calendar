@@ -1,3 +1,4 @@
+#if defined(EINK_CALENDAR_APP)
 #include <Arduino.h>
 #include <ArduinoLog.h>
 #include <Preferences.h>
@@ -11,6 +12,7 @@
 #include <calendar/settings.h>
 #include <calendar/wake_reason.h>
 #include <calendar/wifi_manager.h>
+#include <calendar/weather_client.h>
 #include <config.h>
 #include <display.h>
 #include <esp_sleep.h>
@@ -70,6 +72,10 @@ public:
     display_calendar_circle(x, y, radius, color(circleColor), filled);
   }
   bool refresh() override { return display_calendar_refresh(); }
+  void bitmap(uint16_t x, uint16_t y, const uint8_t *data, uint16_t width, uint16_t height,
+              calendar::DisplayColor foreground) override {
+    display_calendar_bitmap(x, y, data, width, height, color(foreground));
+  }
 
 private:
   static uint8_t color(calendar::DisplayColor value) {
@@ -83,7 +89,7 @@ private:
 };
 
 bool drawCalendar(const calendar::CalendarEvent *events, size_t count, calendar::CalendarDate date,
-                  int16_t batteryTenthsVolts) {
+                  int16_t batteryTenthsVolts, const calendar::WeatherData &weather) {
   char firmwareVersion[48];
   if (FW_COMMIT[0] != '\0') {
     snprintf(firmwareVersion, sizeof(firmwareVersion), "%s-%s", FW_VERSION_STRING, FW_COMMIT);
@@ -92,7 +98,7 @@ bool drawCalendar(const calendar::CalendarEvent *events, size_t count, calendar:
   }
   EpaperDisplayTarget display;
   return calendar::renderCalendar(display, events, count, date, firmwareVersion, DEVICE_MODEL,
-                                  batteryTenthsVolts);
+                                  batteryTenthsVolts, weather);
 }
 
 const char *statusText(calendar::DisplayStatus status) {
@@ -142,16 +148,19 @@ void drawStatus(calendar::DisplayStatus status, const char *provisioningSsid, co
 
 bool renderIfChanged(calendar::DisplayStatus status, calendar::CalendarDate date,
                      const calendar::CalendarEvent *events, size_t eventCount, int16_t batteryTenthsVolts,
-                     const char *provisioningSsid = "", const char *detail = "") {
-  const uint32_t stateHash =
+                     const char *provisioningSsid = "", const char *detail = "",
+                     const calendar::WeatherData *weather = nullptr) {
+  uint32_t stateHash =
     calendar::displayStateHash(status, date, events, eventCount, batteryTenthsVolts);
+  if (status == calendar::DisplayStatus::Calendar && weather)
+    stateHash = (stateHash ^ calendar::weatherDisplayHash(*weather)) * 16777619UL;
   if (gLastDisplayMarker == kDisplayHashMarker && gLastDisplayHash == stateHash) {
     Serial.println("Calendar render skipped: visible content unchanged");
     return true;
   }
 
   if (status == calendar::DisplayStatus::Calendar) {
-    if (!drawCalendar(events, eventCount, date, batteryTenthsVolts)) {
+    if (!drawCalendar(events, eventCount, date, batteryTenthsVolts, weather ? *weather : calendar::WeatherData{})) {
       Serial.println("Calendar render failed: display target refresh failed");
       return false;
     }
@@ -265,6 +274,8 @@ void calendar_app_setup() {
   const float batteryVoltage = display_battery_voltage();
   const int16_t batteryTenthsVolts =
     batteryVoltage >= 0.0f ? static_cast<int16_t>(lroundf(batteryVoltage * 10.0f)) : -1;
+  calendar::WeatherData weather = {};
+  calendar::loadWeatherCache(weather, WEATHER_LATITUDE, WEATHER_LONGITUDE);
   calendar::WifiManager wifiManager;
   bool connected = false;
 
@@ -357,6 +368,9 @@ void calendar_app_setup() {
     return;
   }
   Serial.printf("Loaded %u visible iCalendar events\n", static_cast<unsigned>(eventCount));
-  renderIfChanged(calendar::DisplayStatus::Calendar, today, events, eventCount, batteryTenthsVolts);
+  calendar::fetchWeather(weather, WEATHER_LATITUDE, WEATHER_LONGITUDE);
+  renderIfChanged(calendar::DisplayStatus::Calendar, today, events, eventCount, batteryTenthsVolts, "", "", &weather);
   enterDeepSleep(true, wifiManager);
 }
+
+#endif // EINK_CALENDAR_APP

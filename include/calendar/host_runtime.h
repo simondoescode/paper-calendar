@@ -34,6 +34,8 @@ public:
   void roundRect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint8_t radius,
                  DisplayColor fill, DisplayColor border) override;
   void circle(uint16_t x, uint16_t y, uint16_t radius, DisplayColor color, bool filled) override;
+  void bitmap(uint16_t x, uint16_t y, const uint8_t *data, uint16_t width, uint16_t height,
+              DisplayColor color) override;
   bool refresh() override;
   bool writeStatus(DisplayStatus status, const char *message);
 

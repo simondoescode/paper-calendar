@@ -3,6 +3,10 @@
 #include <calendar/calendar_renderer.h>
 #include <calendar/host_runtime.h>
 #include <calendar/settings.h>
+#include <calendar/weather_client.h>
+#include <fstream>
+#include <iterator>
+#include <string>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -60,7 +64,17 @@ void runLifecycle(calendar::ConfigStore &store, calendar::HostDisplayTarget &dis
   }
   printf("Refresh complete: %u events; next configured interval %lu seconds.\n",
          static_cast<unsigned>(count), static_cast<unsigned long>(settings.refreshIntervalSeconds));
-  if (!calendar::renderCalendar(display, events, count, today, "host-dev", "calendar-host", -1)) {
+  calendar::WeatherData weather = {};
+  std::ifstream fixture("test/fixtures/open_meteo.json");
+  const std::string json((std::istreambuf_iterator<char>(fixture)), std::istreambuf_iterator<char>());
+  if (calendar::parseWeatherResponse(json.c_str(), json.size(), weather, 0)) {
+    for (size_t i = 0; i < calendar::kWeatherForecastDays; ++i) {
+      const auto date = calendar::calendarDateAddDays(today, i);
+      snprintf(weather.forecast[i].date, sizeof(weather.forecast[i].date), "%04d-%02u-%02u", date.year, date.month, date.day);
+    }
+    printf("[weather] Offline demo fixture (not live weather).\n");
+  }
+  if (!calendar::renderCalendar(display, events, count, today, "host-dev", "calendar-host", -1, weather)) {
     fprintf(stderr, "Could not write calendar preview.\n");
   }
 }

@@ -245,7 +245,10 @@ KEY3/manual wake:
 6. Retrieve and parse the configured private iCalendar feed. A manual wake
    follows the same retrieval path; it does not force a panel redraw if the
    visible state is unchanged.
-7. Render only if the logical visible state has changed.
+7. Load the persisted weather cache and fetch Open-Meteo weather after the
+   calendar feed. Weather failures retain cached data and do not abort the
+   calendar render. Render only if the logical visible state has changed,
+   including displayed weather values and day/night icons.
 8. Sleep the panel through upstream `display_sleep()`, disconnect and disable
    Wi-Fi, set the timer and KEY3 wake sources, and enter ESP32 deep sleep.
 
@@ -258,6 +261,73 @@ Upstream code calls this the device interrupt pin rather than naming it
 KEY3, so verify the physical KEY3-to-GPIO5 association on the assembled
 hardware. NTP server names, Wi-Fi connection timeout, timezone rule, and NTP
 timeout live beside the interval in central configuration.
+
+## Open-Meteo weather
+
+The calendar uses the [Open-Meteo forecast API](https://open-meteo.com/en/docs).
+No API key is required for this personal, non-commercial use. Weather runs
+once during the existing refresh cycle (12 hours by default), including a
+manual button refresh. It adds no timer, polling loop or separate panel refresh.
+
+Set `WEATHER_LATITUDE` and `WEATHER_LONGITUDE` in
+`include/calendar/calendar_config.h`, or override both using build flags on
+`TRMNL_7inch5_OG_DIY_Kit`, for example:
+
+```ini
+    -D WEATHER_LATITUDE=51.5074
+    -D WEATHER_LONGITUDE=-0.1278
+```
+
+The defaults are London. These coordinates are sent to Open-Meteo; the device
+does not use GPS or geolocation. The actual URL format is:
+
+```text
+https://api.open-meteo.com/v1/forecast?latitude=51.507400&longitude=-0.127800&current=temperature_2m,apparent_temperature,weather_code,is_day,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset&timezone=auto&forecast_days=3&temperature_unit=celsius&wind_speed_unit=kmh
+```
+
+The internal model holds current temperature, apparent temperature, wind,
+condition and day/night state, plus three daily forecasts with high/low,
+rain probability and sunrise/sunset. Sunrise/sunset are copied as local
+`HH:MM` from the API's `timezone=auto` timestamps. Calendar timezone handling
+is unchanged. The existing weather area shows current temperature, condition,
+today's high/low and rain probability; the sidebar shows three forecast days.
+Wind and apparent temperature are retained for future use.
+
+HTTPS uses the existing HTTPClient/WiFiClientSecure stack and CA bundle.
+Connect, TLS handshake and response stages have 10-second timeouts; the body
+is capped at 4096 bytes, JSON nesting at four levels and parser allocation
+at an 8192-byte heap arena. DNS timing is also subject to the underlying
+ESP32 network stack. No response JSON is passed to the renderer or logged.
+
+Successful responses replace one versioned Preferences blob in the
+`cal-weather` namespace. Boot loads and revalidates that cache; a coordinate
+change invalidates it. Failed HTTPS, non-200, oversized, incomplete or invalid
+responses preserve the last successful data. Cached weather may therefore be
+old during an outage; there is no expiration that discards it. A device with
+no valid cache displays **Weather unavailable** and omits forecast metrics.
+NVS writes occur only after a successful fetch, never during rendering.
+Fetch timestamps are excluded from display-change detection.
+
+WMO mapping is centralized in `weatherConditionFromWmoCode()`:
+
+| Codes | Condition / Lucide icon |
+| --- | --- |
+| 0 | Clear / sun (moon at night) |
+| 1, 2 | Partly cloudy / cloud-sun (cloud-moon at night) |
+| 3 | Cloudy / cloud |
+| 45, 48 | Fog / cloud-fog |
+| 51, 53, 55, 56, 57 | Drizzle / cloud-drizzle |
+| 61, 63, 66 | Rain / cloud-rain |
+| 65, 67, 80, 81, 82 | Heavy rain / cloud-rain-wind |
+| 71, 73, 75, 77, 85, 86 | Snow / cloud-snow |
+| 95, 96, 99 | Thunderstorm / cloud-lightning |
+| Other | Unknown / cloud fallback |
+
+The host preview reads the deterministic `test/fixtures/open_meteo.json`
+fixture using the production parser, with forecast dates moved relative to
+the host date. It logs that this is demo weather and makes no live request.
+Offline tests cover all code mappings, day/night icons, parsing, invalid
+responses preserving cached data, weather hashes and one refresh per render.
 
 ## Avoiding unnecessary panel refreshes
 

@@ -135,11 +135,11 @@ extern BQ27427 lipo; // Use lipo.[] to interact with the library in an Arduino
 #include "fonts/nicoclean_8.h"
 #include "fonts/Inter_18.h"
 #include "fonts/Roboto_Black_24.h"
-#include "fonts/Manrope_Bold_35.h"
-#include "fonts/Manrope_Bold_19.h"
-#include "fonts/Manrope_SemiBold_14.h"
-#include "fonts/Manrope_Medium_11.h"
+#include "fonts/Manrope_Bold_25.h"
+#include "fonts/Manrope_Bold_13.h"
+#include "fonts/Manrope_SemiBold_11.h"
 #include "fonts/Manrope_Medium_10.h"
+#include "fonts/Manrope_Medium_8.h"
 #include <globals.h>
 static uint8_t *pDither;
 
@@ -724,12 +724,12 @@ bool display_calendar_begin()
 static const uint8_t *display_calendar_font(uint8_t font_size)
 {
     switch (font_size) {
-    case calendar::kCalendarFontMain: return Manrope_Bold_35;
-    case calendar::kCalendarFontHeading: return Manrope_Bold_19;
-    case calendar::kCalendarFontTitle: return Manrope_SemiBold_14;
-    case calendar::kCalendarFontMetadata: return Manrope_Medium_11;
-    case calendar::kCalendarFontFooter: return Manrope_Medium_10;
-    default: return Manrope_Medium_11;
+    case calendar::kCalendarFontMain: return Manrope_Bold_25;
+    case calendar::kCalendarFontHeading: return Manrope_Bold_13;
+    case calendar::kCalendarFontTitle: return Manrope_SemiBold_11;
+    case calendar::kCalendarFontMetadata: return Manrope_Medium_10;
+    case calendar::kCalendarFontFooter: return Manrope_Medium_8;
+    default: return Manrope_Medium_10;
     }
 }
 
@@ -777,6 +777,18 @@ uint8_t display_calendar_font_height(uint8_t font_size)
 #else
     (void)font_size;
     return 0;
+#endif
+}
+
+void display_calendar_bitmap(uint16_t x, uint16_t y, const uint8_t *data, uint16_t width,
+                             uint16_t height, uint8_t color)
+{
+#ifdef BB_EPAPER
+    if (data != nullptr && width != 0 && height != 0) {
+        bbep.drawSprite(data, width, height, (width + 7) / 8, x, y, color);
+    }
+#else
+    (void)x; (void)y; (void)data; (void)width; (void)height; (void)color;
 #endif
 }
 

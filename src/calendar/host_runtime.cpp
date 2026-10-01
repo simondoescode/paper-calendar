@@ -7,11 +7,11 @@
 #include <calendar/icalendar_parser.h>
 #include <calendar/mock_calendar_provider.h>
 #include "host_font_decoder/Group5.h"
-#include <fonts/Manrope_Bold_35.h>
-#include <fonts/Manrope_Bold_19.h>
+#include <fonts/Manrope_Bold_25.h>
+#include <fonts/Manrope_Bold_13.h>
+#include <fonts/Manrope_Medium_8.h>
 #include <fonts/Manrope_Medium_10.h>
-#include <fonts/Manrope_Medium_11.h>
-#include <fonts/Manrope_SemiBold_14.h>
+#include <fonts/Manrope_SemiBold_11.h>
 
 #include <algorithm>
 #include <array>
@@ -304,12 +304,12 @@ void setHostPixel(std::vector<uint8_t> &pixels, int x, int y, DisplayColor color
 
 const uint8_t *hostCalendarFont(uint8_t size) {
   switch (size) {
-  case kCalendarFontMain: return Manrope_Bold_35;
-  case kCalendarFontHeading: return Manrope_Bold_19;
-  case kCalendarFontTitle: return Manrope_SemiBold_14;
-  case kCalendarFontMetadata: return Manrope_Medium_11;
-  case kCalendarFontFooter: return Manrope_Medium_10;
-  default: return Manrope_Medium_11;
+  case kCalendarFontMain: return Manrope_Bold_25;
+  case kCalendarFontHeading: return Manrope_Bold_13;
+  case kCalendarFontTitle: return Manrope_SemiBold_11;
+  case kCalendarFontMetadata: return Manrope_Medium_10;
+  case kCalendarFontFooter: return Manrope_Medium_8;
+  default: return Manrope_Medium_10;
   }
 }
 
@@ -345,10 +345,10 @@ void HostDisplayTarget::text(uint16_t x, uint16_t y, const char *value, uint8_t 
       const uint16_t offset = fontWord(metrics);
       // The decoder reads ahead by a word. Pad the bounded glyph stream so
       // the last glyph never reads beyond the font array.
-      const size_t fontBytes = size == kCalendarFontMain ? sizeof(Manrope_Bold_35)
-          : size == kCalendarFontHeading ? sizeof(Manrope_Bold_19)
-          : size == kCalendarFontTitle ? sizeof(Manrope_SemiBold_14)
-          : size == kCalendarFontFooter ? sizeof(Manrope_Medium_10) : sizeof(Manrope_Medium_11);
+      const size_t fontBytes = size == kCalendarFontMain ? sizeof(Manrope_Bold_25)
+          : size == kCalendarFontHeading ? sizeof(Manrope_Bold_13)
+          : size == kCalendarFontTitle ? sizeof(Manrope_SemiBold_11)
+          : size == kCalendarFontFooter ? sizeof(Manrope_Medium_8) : sizeof(Manrope_Medium_10);
       const size_t end = *character < last ? bitmapStart + fontWord(metrics + 8) : fontBytes;
       const size_t start = bitmapStart + offset;
       if (end <= start || end > fontBytes) continue;
@@ -385,6 +385,19 @@ uint8_t HostDisplayTarget::fontHeight(uint8_t size) {
   const uint8_t *font = hostCalendarFont(size);
   const size_t index = 'H' - fontWord(font + 2);
   return static_cast<uint8_t>(-static_cast<int8_t>(font[12 + index * 8 + 6]));
+}
+
+void HostDisplayTarget::bitmap(uint16_t x, uint16_t y, const uint8_t *data, uint16_t width,
+                               uint16_t height, DisplayColor color) {
+  if (_impl == nullptr || data == nullptr) return;
+  const size_t pitch = (width + 7) / 8;
+  for (uint16_t row = 0; row < height; ++row) {
+    for (uint16_t column = 0; column < width; ++column) {
+      if ((data[row * pitch + column / 8] & (0x80u >> (column & 7))) != 0) {
+        setHostPixel(_impl->pixels, static_cast<int>(x) + column, static_cast<int>(y) + row, color);
+      }
+    }
+  }
 }
 
 void HostDisplayTarget::line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, DisplayColor color) {

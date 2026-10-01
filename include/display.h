@@ -131,6 +131,8 @@ void display_calendar_fill_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t
 void display_calendar_round_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint8_t radius,
                                  uint8_t fill, uint8_t border);
 void display_calendar_circle(uint16_t x, uint16_t y, uint16_t radius, uint8_t color, bool filled);
+void display_calendar_bitmap(uint16_t x, uint16_t y, const uint8_t *data, uint16_t width,
+                             uint16_t height, uint8_t color);
 bool display_calendar_refresh();
 float display_battery_voltage();
 

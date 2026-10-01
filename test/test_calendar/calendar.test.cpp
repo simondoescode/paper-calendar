@@ -6,6 +6,8 @@
 #include <calendar/mock_calendar_provider.h>
 #include <calendar/settings.h>
 #include <calendar/wake_reason.h>
+#include <calendar/weather_icons.h>
+#include <calendar/weather_client.h>
 #include <unity.h>
 
 #include <stdlib.h>
@@ -441,6 +443,90 @@ void test_host_settings_malformed_file_fails_with_safe_defaults(void) {
   remove(path);
 }
 
+std::string weatherFixture() {
+  std::ifstream file("test/fixtures/open_meteo.json");
+  return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+}
+calendar::WeatherData parsedWeatherFixture() {
+  const std::string json = weatherFixture();
+  calendar::WeatherData weather = {};
+  TEST_ASSERT_TRUE(calendar::parseWeatherResponse(json.c_str(), json.size(), weather, 123));
+  return weather;
+}
+void test_weather_wmo_mapping_and_url() {
+  using calendar::WeatherCondition;
+  const int codes[] = {0,1,2,3,45,48,51,53,55,56,57,61,63,66,65,67,80,81,82,71,73,75,77,85,86,95,96,99,-1,1234};
+  const WeatherCondition expected[] = {WeatherCondition::Clear,WeatherCondition::PartlyCloudy,WeatherCondition::PartlyCloudy,WeatherCondition::Cloudy,
+    WeatherCondition::Fog,WeatherCondition::Fog,WeatherCondition::Drizzle,WeatherCondition::Drizzle,WeatherCondition::Drizzle,WeatherCondition::Drizzle,WeatherCondition::Drizzle,
+    WeatherCondition::Rain,WeatherCondition::Rain,WeatherCondition::Rain,WeatherCondition::HeavyRain,WeatherCondition::HeavyRain,WeatherCondition::HeavyRain,WeatherCondition::HeavyRain,WeatherCondition::HeavyRain,
+    WeatherCondition::Snow,WeatherCondition::Snow,WeatherCondition::Snow,WeatherCondition::Snow,WeatherCondition::Snow,WeatherCondition::Snow,
+    WeatherCondition::Thunderstorm,WeatherCondition::Thunderstorm,WeatherCondition::Thunderstorm,WeatherCondition::Unknown,WeatherCondition::Unknown};
+  for (size_t i = 0; i < sizeof(codes)/sizeof(codes[0]); ++i) TEST_ASSERT_EQUAL_INT(static_cast<int>(expected[i]), static_cast<int>(calendar::weatherConditionFromWmoCode(codes[i])));
+  char url[512];
+  TEST_ASSERT_TRUE(calendar::buildWeatherUrl(url, sizeof(url), 51.5074, -0.1278));
+  TEST_ASSERT_NOT_NULL(strstr(url, "latitude=51.507400&longitude=-0.127800"));
+  TEST_ASSERT_NOT_NULL(strstr(url, "timezone=auto&forecast_days=3"));
+  TEST_ASSERT_FALSE(calendar::buildWeatherUrl(url, sizeof(url), 91, 0));
+  TEST_ASSERT_FALSE(calendar::buildWeatherUrl(url, 10, 0, 0));
+}
+void test_weather_parser_preserves_cache_on_invalid_response() {
+  auto weather = parsedWeatherFixture();
+  TEST_ASSERT_TRUE(weather.valid);
+  TEST_ASSERT_FLOAT_WITHIN(0.01, 14.2, weather.current.temperatureC);
+  TEST_ASSERT_EQUAL_STRING("07:01", weather.forecast[0].sunrise);
+  TEST_ASSERT_EQUAL_STRING("18:33", weather.forecast[2].sunset);
+  TEST_ASSERT_EQUAL_UINT32(123, weather.fetchedAt);
+  const auto before = weather;
+  std::string json = weatherFixture();
+  for (const char *bad : {"{", "{}", "{\"current\":null}", "[]"}) {
+    TEST_ASSERT_FALSE(calendar::parseWeatherResponse(bad, strlen(bad), weather, 456));
+    TEST_ASSERT_EQUAL_MEMORY(&before, &weather, sizeof(weather));
+  }
+  const char *fields[] = {"temperature_2m", "apparent_temperature", "wind_speed_10m", "weather_code", "is_day", "time", "temperature_2m_max", "temperature_2m_min", "precipitation_probability_max", "sunrise", "sunset"};
+  for (const char *field : fields) {
+    std::string bad = json;
+    const std::string key = std::string("\"") + field + "\"";
+    bad.replace(bad.find(key), key.size(), "\"missing\"");
+    TEST_ASSERT_FALSE(calendar::parseWeatherResponse(bad.c_str(), bad.size(), weather, 456));
+    TEST_ASSERT_EQUAL_MEMORY(&before, &weather, sizeof(weather));
+  }
+  TEST_ASSERT_FALSE(calendar::parseWeatherResponse(json.c_str(), json.find_last_of('}'), weather, 456));
+  const std::string oversized(4097, ' ');
+  TEST_ASSERT_FALSE(calendar::parseWeatherResponse(oversized.c_str(), oversized.size(), weather, 456));
+  const char *original[] = {"\"is_day\":1", "\"temperature_2m\":14.2", "\"weather_code\":[2,61,0]",
+                            "\"precipitation_probability_max\":[20,80,5]", "2026-10-01T07:01", "2026-10-03"};
+  const char *replacement[] = {"\"is_day\":2", "\"temperature_2m\":null", "\"weather_code\":[2,null,0]",
+                               "\"precipitation_probability_max\":[101,80,5]", "2026-10-01T25:01", "2026-02-30"};
+  for (size_t i = 0; i < sizeof(original)/sizeof(original[0]); ++i) {
+    std::string bad = json;
+    bad.replace(bad.find(original[i]), strlen(original[i]), replacement[i]);
+    TEST_ASSERT_FALSE(calendar::parseWeatherResponse(bad.c_str(), bad.size(), weather, 456));
+    TEST_ASSERT_EQUAL_MEMORY(&before, &weather, sizeof(weather));
+  }
+  std::string unknown = json;
+  unknown.replace(unknown.find("\"weather_code\":2"), 16, "\"weather_code\":1234");
+  calendar::WeatherData unknownWeather = {};
+  TEST_ASSERT_TRUE(calendar::parseWeatherResponse(unknown.c_str(), unknown.size(), unknownWeather, 456));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(calendar::WeatherCondition::Unknown), static_cast<int>(unknownWeather.current.condition));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(calendar::WeatherIcon::Cloudy), static_cast<int>(calendar::getWeatherIcon(unknownWeather.current.condition, true)));
+  std::string night = json;
+  night.replace(night.find("\"is_day\":1"), 10, "\"is_day\":0");
+  TEST_ASSERT_TRUE(calendar::parseWeatherResponse(night.c_str(), night.size(), weather, 456));
+  TEST_ASSERT_FALSE(weather.current.isDay);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(calendar::WeatherIcon::PartlyCloudyNight), static_cast<int>(calendar::getWeatherIcon(weather.current.condition, weather.current.isDay)));
+}
+void test_weather_hash_tracks_visible_values() {
+  auto weather = parsedWeatherFixture();
+  const auto hash = calendar::weatherDisplayHash(weather);
+  weather.fetchedAt++;
+  weather.current.windSpeedKmh++;
+  TEST_ASSERT_EQUAL_UINT32(hash, calendar::weatherDisplayHash(weather));
+  weather.current.isDay = false;
+  TEST_ASSERT_NOT_EQUAL(hash, calendar::weatherDisplayHash(weather));
+  weather.valid = false;
+  TEST_ASSERT_NOT_EQUAL(hash, calendar::weatherDisplayHash(weather));
+}
+
 void test_host_fixture_provider_renders_shared_800_by_480_png(void) {
   const calendar::CalendarDate today = {2026, 10, 1};
   calendar::CalendarSettings settings = calendar::defaultCalendarSettings();
@@ -452,8 +538,27 @@ void test_host_fixture_provider_renders_shared_800_by_480_png(void) {
   TEST_ASSERT_TRUE(count > 0);
 
   const char *path = "calendar-preview-test.png";
-  calendar::HostDisplayTarget display(path);
-  TEST_ASSERT_TRUE(calendar::renderCalendar(display, events, count, today, "test", "calendar-host", -1));
+  class BoundsCheckedDisplay : public calendar::HostDisplayTarget {
+  public:
+    explicit BoundsCheckedDisplay(const char *filePath) : HostDisplayTarget(filePath) {}
+    void bitmap(uint16_t x, uint16_t y, const uint8_t *data, uint16_t width, uint16_t height,
+                calendar::DisplayColor color) override {
+      TEST_ASSERT_TRUE(x + width <= 800);
+      TEST_ASSERT_TRUE(y + height <= 480);
+      HostDisplayTarget::bitmap(x, y, data, width, height, color);
+      ++bitmapCount;
+    }
+    unsigned bitmapCount = 0;
+    unsigned refreshCount = 0;
+    bool refresh() override { ++refreshCount; return HostDisplayTarget::refresh(); }
+  };
+  BoundsCheckedDisplay display(path);
+  TEST_ASSERT_TRUE(calendar::renderCalendar(display, events, count, today, "test", "calendar-host", -1, parsedWeatherFixture()));
+  TEST_ASSERT_EQUAL_UINT(4, display.bitmapCount);
+  TEST_ASSERT_EQUAL_UINT(1, display.refreshCount);
+  TEST_ASSERT_TRUE(calendar::renderCalendar(display, events, count, today, "test", "calendar-host", -1, calendar::WeatherData{}));
+  TEST_ASSERT_EQUAL_UINT(4, display.bitmapCount);
+  TEST_ASSERT_EQUAL_UINT(2, display.refreshCount);
   std::ifstream file(path, std::ios::binary);
   unsigned char header[25] = {};
   file.read(reinterpret_cast<char *>(header), sizeof(header));
@@ -471,6 +576,53 @@ void test_host_fixture_provider_renders_shared_800_by_480_png(void) {
   TEST_ASSERT_EQUAL_UINT8(1, header[24]);
   file.close();
   remove(path);
+}
+
+void test_weather_conditions_map_to_lucide_icons_with_cloud_fallback(void) {
+  using calendar::WeatherCondition;
+  using calendar::WeatherIcon;
+  struct Mapping { WeatherCondition condition; WeatherIcon day; WeatherIcon night; };
+  const Mapping cases[] = {
+    {WeatherCondition::Clear, WeatherIcon::Sunny, WeatherIcon::ClearNight},
+    {WeatherCondition::PartlyCloudy, WeatherIcon::PartlyCloudy, WeatherIcon::PartlyCloudyNight},
+    {WeatherCondition::Cloudy, WeatherIcon::Cloudy, WeatherIcon::Cloudy},
+    {WeatherCondition::Overcast, WeatherIcon::Cloudy, WeatherIcon::Cloudy},
+    {WeatherCondition::Drizzle, WeatherIcon::Drizzle, WeatherIcon::Drizzle},
+    {WeatherCondition::Rain, WeatherIcon::Rain, WeatherIcon::Rain},
+    {WeatherCondition::HeavyRain, WeatherIcon::HeavyRain, WeatherIcon::HeavyRain},
+    {WeatherCondition::Thunderstorm, WeatherIcon::Thunderstorm, WeatherIcon::Thunderstorm},
+    {WeatherCondition::Snow, WeatherIcon::Snow, WeatherIcon::Snow},
+    {WeatherCondition::Fog, WeatherIcon::Fog, WeatherIcon::Fog},
+    {WeatherCondition::Mist, WeatherIcon::Fog, WeatherIcon::Fog},
+    {WeatherCondition::Wind, WeatherIcon::Wind, WeatherIcon::Wind},
+    {WeatherCondition::Unknown, WeatherIcon::Cloudy, WeatherIcon::Cloudy},
+    {static_cast<WeatherCondition>(255), WeatherIcon::Cloudy, WeatherIcon::Cloudy},
+  };
+  for (const Mapping &mapping : cases) {
+    TEST_ASSERT_EQUAL_UINT(static_cast<unsigned>(mapping.day),
+        static_cast<unsigned>(calendar::getWeatherIcon(mapping.condition, true)));
+    TEST_ASSERT_EQUAL_UINT(static_cast<unsigned>(mapping.night),
+        static_cast<unsigned>(calendar::getWeatherIcon(mapping.condition, false)));
+  }
+  for (const uint8_t size : {calendar::WeatherIcons::FORECAST_SIZE, calendar::WeatherIcons::CURRENT_SIZE}) {
+    for (unsigned index = 0; index <= static_cast<unsigned>(WeatherIcon::Wind); ++index) {
+      const calendar::WeatherBitmap &asset = calendar::WeatherIcons::asset(static_cast<WeatherIcon>(index), size);
+      TEST_ASSERT_NOT_NULL(asset.bitmap);
+      TEST_ASSERT_EQUAL_UINT(size, asset.width);
+      TEST_ASSERT_EQUAL_UINT(size, asset.height);
+      const unsigned pitch = (size + 7) / 8;
+      bool hasInk = false;
+      for (unsigned byte = 0; byte < pitch * size; ++byte) hasInk |= asset.bitmap[byte] != 0;
+      TEST_ASSERT_TRUE(hasInk);
+      // All Lucide strokes retain whitespace inside their asset bounds.
+      for (unsigned byte = 0; byte < pitch; ++byte) {
+        TEST_ASSERT_EQUAL_UINT8(0, asset.bitmap[byte]);
+        TEST_ASSERT_EQUAL_UINT8(0, asset.bitmap[(size - 1) * pitch + byte]);
+      }
+    }
+    TEST_ASSERT_EQUAL_PTR(calendar::WeatherIcons::asset(WeatherIcon::Cloudy, size).bitmap,
+        calendar::WeatherIcons::asset(static_cast<WeatherIcon>(255), size).bitmap);
+  }
 }
 
 void test_host_provider_error_and_missing_configuration_are_clean(void) {
@@ -519,6 +671,10 @@ int main(int argc, char **argv) {
   RUN_TEST(test_host_settings_form_validates_and_persists_portal_submission);
   RUN_TEST(test_host_settings_malformed_file_fails_with_safe_defaults);
   RUN_TEST(test_host_fixture_provider_renders_shared_800_by_480_png);
+  RUN_TEST(test_weather_wmo_mapping_and_url);
+  RUN_TEST(test_weather_parser_preserves_cache_on_invalid_response);
+  RUN_TEST(test_weather_hash_tracks_visible_values);
+  RUN_TEST(test_weather_conditions_map_to_lucide_icons_with_cloud_fallback);
   RUN_TEST(test_host_provider_error_and_missing_configuration_are_clean);
   return UNITY_END();
 }

@@ -1,6 +1,7 @@
 #include <calendar/calendar_renderer.h>
 
 #include <stdio.h>
+#include <math.h>
 #include <string.h>
 
 namespace calendar {
@@ -74,17 +75,30 @@ void fitText(DisplayTarget &display, const char *source, char *output, size_t ou
   }
 }
 
-void drawCurrentWeather(DisplayTarget &display, const CurrentWeather &weather) {
-  WeatherIcons::draw(display, weather.icon, 407, 25, 58, DisplayColor::White);
+void drawCurrentWeather(DisplayTarget &display, const WeatherData &weather) {
+  if (!weather.valid) {
+    display.text(406, baselineFromTop(display, 40, kCalendarFontFooter), "Weather unavailable",
+                 kCalendarFontFooter, DisplayColor::White, DisplayColor::Black);
+    return;
+  }
+  WeatherIcons::draw(display, getWeatherIcon(weather.current.condition, weather.current.isDay),
+                     412, 22, WeatherIcons::CURRENT_SIZE, DisplayColor::White);
   char temperature[12];
-  char range[28];
-  snprintf(temperature, sizeof(temperature), "%d", weather.temperature);
-  snprintf(range, sizeof(range), "H: %d  L: %d", weather.high, weather.low);
-  display.text(474, baselineFromTop(display, 29, kCalendarFontHeading), temperature, kCalendarFontHeading,
+  char range[40];
+  char fittedRange[40];
+  snprintf(temperature, sizeof(temperature), "%ld", lroundf(weather.current.temperatureC));
+  snprintf(range, sizeof(range), "H:%ld L:%ld Rain:%d%%", lroundf(weather.forecast[0].temperatureMaxC),
+           lroundf(weather.forecast[0].temperatureMinC), weather.forecast[0].precipitationProbability);
+  display.text(474, baselineFromTop(display, 32, kCalendarFontHeading), temperature, kCalendarFontHeading,
                DisplayColor::White, DisplayColor::Black);
-  display.circle(static_cast<uint16_t>(479 + display.textWidth(temperature, kCalendarFontHeading)), 36, 3,
+  display.circle(static_cast<uint16_t>(479 + display.textWidth(temperature, kCalendarFontHeading)), 33, 3,
                  DisplayColor::White, false);
-  display.text(474, baselineFromTop(display, 75, kCalendarFontFooter), range, kCalendarFontFooter,
+  char label[24];
+  fitText(display, conditionLabel(weather.current.condition), label, sizeof(label), kCalendarFontFooter, 138);
+  display.text(406, baselineFromTop(display, 75, kCalendarFontFooter), label, kCalendarFontFooter,
+               DisplayColor::White, DisplayColor::Black);
+  fitText(display, range, fittedRange, sizeof(fittedRange), kCalendarFontFooter, 138);
+  display.text(406, baselineFromTop(display, 94, kCalendarFontFooter), fittedRange, kCalendarFontFooter,
                DisplayColor::White, DisplayColor::Black);
 }
 
@@ -100,7 +114,7 @@ void drawTodayCard(DisplayTarget &display, uint16_t y, const CalendarEvent &even
   fitText(display, secondaryText(event), detail, sizeof(detail), kCalendarFontFooter, 390);
   display.text(29, static_cast<uint16_t>(y + (kTodayCardHeight + display.fontHeight(kCalendarFontMetadata)) / 2),
                time, kCalendarFontMetadata);
-  display.text(140, baselineFromTop(display, y + 9, kCalendarFontTitle), title, kCalendarFontTitle);
+  display.text(140, baselineFromTop(display, y + 17, kCalendarFontTitle), title, kCalendarFontTitle);
   if (detail[0] != '\0') {
     display.text(140, baselineFromTop(display, y + 43, kCalendarFontFooter), detail, kCalendarFontFooter);
   }
@@ -130,29 +144,24 @@ void drawToday(DisplayTarget &display, const CalendarEvent *events, size_t count
 }
 
 void drawForecast(DisplayTarget &display, const WeatherData &weather) {
-  for (size_t i = 0; i < 5; ++i) {
-    const uint16_t x = static_cast<uint16_t>(568 + i * 45);
+  if (!weather.valid) return;
+  for (size_t i = 0; i < kWeatherForecastDays; ++i) {
+    const uint16_t x = static_cast<uint16_t>(580 + i * 68);
+    int year = 0; unsigned month = 0, day = 0;
+    sscanf(weather.forecast[i].date, "%d-%u-%u", &year, &month, &day);
+    const CalendarDate date = {year, month, day};
     char weekday[4];
-    snprintf(weekday, sizeof(weekday), "%s", weather.forecast[i].weekday);
-    for (size_t letter = 1; letter < strlen(weekday); ++letter) {
-      if (weekday[letter] >= 'A' && weekday[letter] <= 'Z') weekday[letter] += 'a' - 'A';
-    }
-    const uint16_t weekdayWidth = display.textWidth(weekday, kCalendarFontFooter);
-    const uint16_t weekdayX = static_cast<uint16_t>(x + (45 - (weekdayWidth < 45 ? weekdayWidth : 45)) / 2);
-    display.text(weekdayX, baselineFromTop(display, 71, kCalendarFontFooter), weekday,
-                 kCalendarFontFooter,
-                 DisplayColor::Black, DisplayColor::LightGrey);
-    WeatherIcons::draw(display, weather.forecast[i].icon, x + 5, 92, 30);
-    char temperature[10];
-    snprintf(temperature, sizeof(temperature), "%d", weather.forecast[i].temperature);
-    const uint16_t temperatureWidth = display.textWidth(temperature, kCalendarFontFooter);
-    const uint16_t groupWidth = static_cast<uint16_t>(temperatureWidth + 7);
-    const uint16_t temperatureX = static_cast<uint16_t>(x + (45 - (groupWidth < 45 ? groupWidth : 45)) / 2);
-    display.text(temperatureX, baselineFromTop(display, 135, kCalendarFontFooter), temperature,
-                 kCalendarFontFooter,
-                 DisplayColor::Black, DisplayColor::LightGrey);
-    display.circle(static_cast<uint16_t>(temperatureX + temperatureWidth + 3), 137, 2,
-                   DisplayColor::Black, false);
+    snprintf(weekday, sizeof(weekday), "%s", kWeekdayNames[calendarWeekday(date)]);
+    for (size_t letter = 1; letter < 3; ++letter) weekday[letter] += 'a' - 'A';
+    display.text(x + 10, baselineFromTop(display, 71, kCalendarFontFooter), weekday,
+                 kCalendarFontFooter, DisplayColor::Black, DisplayColor::LightGrey);
+    WeatherIcons::draw(display, getWeatherIcon(weather.forecast[i].condition, true),
+                       x + 10, 92, WeatherIcons::FORECAST_SIZE);
+    char temperature[12];
+    snprintf(temperature, sizeof(temperature), "%ld/%ld", lroundf(weather.forecast[i].temperatureMaxC),
+             lroundf(weather.forecast[i].temperatureMinC));
+    display.text(x + 4, baselineFromTop(display, 135, kCalendarFontFooter), temperature,
+                 kCalendarFontFooter, DisplayColor::Black, DisplayColor::LightGrey);
   }
 }
 
@@ -170,7 +179,7 @@ void drawUpcomingCard(DisplayTarget &display, uint16_t y, const CalendarEvent &e
   display.text(590, baselineFromTop(display, y + 31, kCalendarFontTitle), number, kCalendarFontTitle);
   display.text(588, baselineFromTop(display, y + 63, kCalendarFontFooter),
                kMonthNames[eventDate.month - 1], kCalendarFontFooter);
-  display.text(644, baselineFromTop(display, y + 11, kCalendarFontTitle), title, kCalendarFontTitle);
+  display.text(644, baselineFromTop(display, y + 15, kCalendarFontTitle), title, kCalendarFontTitle);
   display.text(644, baselineFromTop(display, y + 43, kCalendarFontFooter), time, kCalendarFontFooter);
   const char *detail = secondaryText(event);
   if (detail[0] != '\0') {
@@ -186,10 +195,11 @@ void drawLater(DisplayTarget &display, const CalendarEvent *events, size_t count
   display.fillRect(kLeftColumnWidth, 0, kRightColumnWidth, kDisplayHeight, DisplayColor::LightGrey);
   const uint8_t headingFont = display.textWidth("Later this week", kCalendarFontHeading) <= 208
       ? kCalendarFontHeading : kCalendarFontTitle;
-  display.text(576, baselineFromTop(display, 10, headingFont), "Later this week", headingFont,
+  display.text(576, baselineFromTop(display, 17, headingFont), "Later this week", headingFont,
                DisplayColor::Black, DisplayColor::LightGrey);
   char range[52];
-  formatForecastRange(date, range, sizeof(range));
+  if (weather.valid) snprintf(range, sizeof(range), "%s to %s", weather.forecast[0].date + 5, weather.forecast[2].date + 5);
+  else formatForecastRange(date, range, sizeof(range));
   char fittedRange[52];
   fitText(display, range, fittedRange, sizeof(fittedRange), kCalendarFontFooter, 208);
   display.text(576, baselineFromTop(display, 46, kCalendarFontFooter), fittedRange, kCalendarFontFooter,
@@ -234,7 +244,7 @@ const char *statusHeading(DisplayStatus status) {
 bool renderCalendar(DisplayTarget &display, const CalendarEvent *events, size_t eventCount, CalendarDate date,
                     const char *firmwareVersion, const char *deviceModel, int16_t batteryTenthsVolts) {
   return renderCalendar(display, events, eventCount, date, firmwareVersion, deviceModel, batteryTenthsVolts,
-                        defaultWeatherData());
+                        WeatherData{});
 }
 
 bool renderCalendar(DisplayTarget &display, const CalendarEvent *events, size_t eventCount, CalendarDate date,
@@ -247,7 +257,7 @@ bool renderCalendar(DisplayTarget &display, const CalendarEvent *events, size_t 
   display.fillRect(0, 0, kLeftColumnWidth, kHeaderHeight, DisplayColor::Black);
   char dateLabel[36];
   formatDate(date, dateLabel, sizeof(dateLabel));
-  display.text(20, baselineFromTop(display, 10, kCalendarFontMetadata), dateLabel, kCalendarFontMetadata,
+  display.text(20, baselineFromTop(display, 18, kCalendarFontMetadata), dateLabel, kCalendarFontMetadata,
                DisplayColor::White, DisplayColor::Black);
   const char *weekday = kFullWeekdayNames[calendarWeekday(date)];
   char shortWeekday[4];
@@ -255,9 +265,9 @@ bool renderCalendar(DisplayTarget &display, const CalendarEvent *events, size_t 
     snprintf(shortWeekday, sizeof(shortWeekday), "%.3s", weekday);
     weekday = shortWeekday;
   }
-  display.text(20, baselineFromTop(display, 37, kCalendarFontMain), weekday, kCalendarFontMain,
+  display.text(20, baselineFromTop(display, 46, kCalendarFontMain), weekday, kCalendarFontMain,
                DisplayColor::White, DisplayColor::Black);
-  drawCurrentWeather(display, weather.current);
+  drawCurrentWeather(display, weather);
   drawToday(display, events, eventCount, date);
   drawLater(display, events, eventCount, date, weather);
   return display.refresh();

@@ -10,11 +10,11 @@ enum class DisplayColor : uint8_t {
   LightGrey,
 };
 
-constexpr uint8_t kCalendarFontMain = 52;
-constexpr uint8_t kCalendarFontHeading = 28;
-constexpr uint8_t kCalendarFontTitle = 20;
-constexpr uint8_t kCalendarFontMetadata = 16;
-constexpr uint8_t kCalendarFontFooter = 14;
+constexpr uint8_t kCalendarFontMain = 36;
+constexpr uint8_t kCalendarFontHeading = 18;
+constexpr uint8_t kCalendarFontTitle = 16;
+constexpr uint8_t kCalendarFontMetadata = 13;
+constexpr uint8_t kCalendarFontFooter = 11;
 
 class DisplayTarget {
 public:
@@ -32,6 +32,9 @@ public:
   virtual void roundRect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint8_t radius,
                          DisplayColor fill, DisplayColor border) = 0;
   virtual void circle(uint16_t x, uint16_t y, uint16_t radius, DisplayColor color, bool filled) = 0;
+  // bb_epaper sprite format: row-major, MSB first, 1 = ink, 0 = transparent.
+  virtual void bitmap(uint16_t x, uint16_t y, const uint8_t *data, uint16_t width, uint16_t height,
+                      DisplayColor color) = 0;
   virtual bool refresh() = 0;
 };
 
