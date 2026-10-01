@@ -65,7 +65,9 @@ private:
 
   std::function<void()> _resetcallback;
   std::function<void()> _tickCallback = nullptr;
+  std::function<void()> _portalTimeoutCallback = nullptr;
   String _hostname = "";
+  uint32_t _connectionTimeoutMs = CONNECTION_TIMEOUT;
 
   WifiCredentials _savedWifis[WIFI_MAX_SAVED_CREDS];
   int _lastIndex = 0;
@@ -98,6 +100,8 @@ public:
   /// @brief Starts WiFi configuration portal.
   /// @return True if successfully connected to provided SSID, false otherwise.
   bool startPortal();
+  void setPortalTimeoutCallback(std::function<void()> callback);
+  void setConnectionTimeout(uint32_t timeoutMs);
 
   /// @brief Returns the SSID broadcast by the setup access point (e.g. "TRMNL-4D4CF0").
   ///        Derived from the eFuse MAC, so it is stable and available before startPortal().

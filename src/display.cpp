@@ -553,6 +553,74 @@ uint16_t display_width()
     return bbep.width();
 }
 
+bool display_calendar_begin()
+{
+#ifdef BB_EPAPER
+    if (bbep.allocBuffer(false) != BBEP_SUCCESS) {
+        Log_error("display_calendar_begin: failed to allocate e-paper buffer");
+        return false;
+    }
+    bbep.fillScreen(BBEP_WHITE);
+    return true;
+#else
+    Log_error("display_calendar_begin: calendar drawing requires an SPI e-paper panel");
+    return false;
+#endif
+}
+
+void display_calendar_text(uint16_t x, uint16_t y, const char *text, uint8_t font_size)
+{
+#ifdef BB_EPAPER
+    const uint8_t *font = Inter_18;
+    if (font_size == 8) {
+        font = nicoclean_8;
+    } else if (font_size == 24) {
+        font = Roboto_Black_24;
+    }
+    bbep.setFont(font);
+    bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
+    bbep.setCursor(x, y);
+    bbep.print(text);
+#else
+    (void)x;
+    (void)y;
+    (void)text;
+    (void)font_size;
+#endif
+}
+
+void display_calendar_line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2)
+{
+#ifdef BB_EPAPER
+    bbep.drawLine(x1, y1, x2, y2, BBEP_BLACK);
+#else
+    (void)x1;
+    (void)y1;
+    (void)x2;
+    (void)y2;
+#endif
+}
+
+bool display_calendar_refresh()
+{
+#ifdef BB_EPAPER
+    const bool refreshed = display_update_epaper(REFRESH_FULL, true, true, PLANE_0);
+    bbep.freeBuffer();
+    return refreshed;
+#else
+    return false;
+#endif
+}
+
+float display_battery_voltage()
+{
+    if (pDevice == nullptr) {
+        Log_error("display_battery_voltage: board configuration is not initialized");
+        return -1.0f;
+    }
+    return battery().readVoltage(pDevice);
+}
+
 #ifdef BOARD_X_CLASS
 void display_draw_touchbar_indicator(touchbar_side_t side, bool filled)
 {

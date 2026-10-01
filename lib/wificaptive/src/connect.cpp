@@ -144,7 +144,7 @@ void captureEventData(WiFiEvent_t event, WiFiEventInfo_t info, WifiEventData *ev
   }
 }
 
-WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials credentials) {
+WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials credentials, uint32_t timeoutMs) {
   WifiEventData eventData;
 
   // To clear any prior event state before WiFi.begin(), so that the connection attempt starts with a clean slate
@@ -191,7 +191,7 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
   WiFi.setAutoReconnect(false);
 
   if (credentials.isEnterprise) {
-    Log_info("WiFi: Connecting to WPA2 Enterprise network: %s", credentials.ssid.c_str());
+    Log_info("WiFi: Connecting to WPA2 Enterprise network");
 
     if (credentials.identity.length() == 0) {
       Log_error("WiFi: Enterprise mode requires an identity");
@@ -284,7 +284,7 @@ WifiConnectionResult initiateConnectionAndWaitForOutcome(const WifiCredentials c
     Log_info("WiFi: begin (WPA2-Personal), starting from status %s", wifiStatusStr(beginResult));
   }
 
-  auto result = waitForConnectResult(CONNECTION_TIMEOUT, eventData);
+  auto result = waitForConnectResult(timeoutMs, eventData);
 
     // if connection failed and we were using enterprise, clean up
   if (result != WL_CONNECTED && credentials.isEnterprise) {

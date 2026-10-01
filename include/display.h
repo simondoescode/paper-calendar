@@ -113,6 +113,15 @@ uint16_t display_height();
 uint16_t display_width();
 
 /**
+ * @brief Calendar drawing helpers backed by the existing bb_epaper buffer.
+ */
+bool display_calendar_begin();
+void display_calendar_text(uint16_t x, uint16_t y, const char *text, uint8_t font_size);
+void display_calendar_line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2);
+bool display_calendar_refresh();
+float display_battery_voltage();
+
+/**
  * @brief Function to draw multi-line text onto the display
  * @param x_start X coordinate to start drawing
  * @param y_start Y coordinate to start drawing

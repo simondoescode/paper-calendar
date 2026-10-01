@@ -358,6 +358,8 @@
     }
   </style>
   <script>
+    var calendarMode = false;
+
     function setRefreshButtonState(scanning) {
       var btn = document.getElementById('btnRefresh');
       btn.disabled = scanning;
@@ -406,6 +408,7 @@
       var server = document.getElementById('server').value;
       var band = document.getElementById('band').value;
       var isEnterprise = document.getElementById('isEnterpriseHidden').value === 'true';
+      var clearCalendarFeed = calendarMode && localStorage.getItem('clearCalendarFeed') === 'true';
 
       if (!ssid) {
         displayAlert('Please enter your Wi-Fi name', "warning");
@@ -424,26 +427,31 @@
       let customServerVisible = document.getElementById('custom_server_form_group').style.display != 'none';
       if (customServerVisible && server) {
         try {
-          new URL(server);
-
-          if (!server.startsWith('http://') && !server.startsWith('https://')) {
+          var parsedServer = new URL(server);
+          if (calendarMode && (parsedServer.protocol !== 'https:' || !parsedServer.pathname.toLowerCase().endsWith('.ics'))) {
+            throw new Error();
+          }
+          if (!calendarMode && !server.startsWith('http://') && !server.startsWith('https://')) {
             throw new Error();
           }
         } catch (_) {
-          displayAlert('Please enter a valid URL for your custom server', "warning");
+          displayAlert(calendarMode
+            ? 'Enter the full private iCalendar feed URL ending in .ics; HTTPS is required.'
+            : 'Please enter a valid URL for your custom server', "warning");
           return;
         }
       }
 
       server = server.trim();
-      server = server.replace(/\/+$/, '');
+      if (!calendarMode) server = server.replace(/\/+$/, '');
 
       var body = {
         ssid: ssid,
         pswd: pswd,
         server: server,
         band: band,
-        isEnterprise: isEnterprise
+        isEnterprise: isEnterprise,
+        clearCalendarFeed: clearCalendarFeed
       };
 
       if (isEnterprise) {
@@ -682,14 +690,28 @@
     }
 
     async function loadServerFromDevice() {
-      // pull value from advanced.html, if present
       let server = localStorage.getItem('customServer');
       localStorage.removeItem('customServer');
-      if (!server) {
-        try {
-          const response = await fetch('/device-settings');
-          server = (await response.json()).api_url;
-        } catch (_) { }
+      const clearCalendarFeed = localStorage.getItem('clearCalendarFeed') === 'true';
+      localStorage.removeItem('clearCalendarFeed');
+      let settings = {};
+      try {
+        const response = await fetch('/device-settings');
+        settings = await response.json();
+        calendarMode = settings.calendar_mode === true;
+      } catch (_) { }
+      if (calendarMode) {
+        document.querySelector('label[for="server"]').textContent = 'Private iCalendar feed URL';
+        document.getElementById('server').type = 'password';
+        document.getElementById('server').autocomplete = 'new-password';
+        document.getElementById('server').placeholder = settings.calendar_feed_configured
+          ? 'Saved privately; enter a new URL to replace'
+          : 'Paste the private HTTPS .ics URL in Advanced settings';
+        if (clearCalendarFeed) {
+          document.getElementById('server').value = '';
+        }
+      } else if (!server) {
+        server = settings.api_url;
       }
       if (server) {
         document.getElementById('server').value = server;

@@ -7,6 +7,26 @@
 
 #include "WifiCaptive.h"
 
+namespace {
+  bool isCalendarFeedUrlValid(String url) {
+    url.trim();
+    if (!url.startsWith("https://") || url.length() > 511) {
+      return false;
+    }
+    const int pathStart = url.indexOf('/', 8);
+    if (pathStart < 0) {
+      return false;
+    }
+    int pathEnd = url.indexOf('?', pathStart);
+    if (pathEnd < 0) pathEnd = url.indexOf('#', pathStart);
+    if (pathEnd < 0) pathEnd = url.length();
+    String path = url.substring(pathStart, pathEnd);
+    path.toLowerCase();
+    return path.endsWith(".ics");
+  }
+
+} // namespace
+
 void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperationCallbacks callbacks,
                     const String &modemMac) {
     //======================== Webserver ========================
@@ -76,10 +96,18 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
     Preferences prefs;
     prefs.begin("data", true);
     String apiUrl = prefs.getString("api_url", "");
+#ifdef EINK_CALENDAR_APP
+    const bool configured = apiUrl.length() > 0;
+    prefs.end();
+    request->send(200, "application/json",
+                  String("{\"calendar_mode\":true,\"calendar_feed_configured\":") +
+                    (configured ? "true}" : "false}"));
+#else
     prefs.end();
     apiUrl.replace("\\", "\\\\");
     apiUrl.replace("\"", "\\\"");
     request->send(200, "application/json", "{\"api_url\":\"" + apiUrl + "\"}");
+#endif
   });
 
   auto scanGET = server.on("/scan", HTTP_GET, [callbacks, modemMac](AsyncWebServerRequest *request) {
@@ -156,6 +184,24 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
       String ssid = data["ssid"];
       String pswd = data["pswd"];
       String api_server = data["server"];
+#ifdef EINK_CALENDAR_APP
+      const bool clearCalendarFeed =
+        data["clearCalendarFeed"].is<bool>() && data["clearCalendarFeed"].as<bool>();
+      api_server.trim();
+      if (!api_server.isEmpty() && !isCalendarFeedUrlValid(api_server)) {
+        request->send(400, "application/json", "{\"error\":\"A valid HTTPS .ics feed URL is required\"}");
+        return;
+      }
+      if (api_server.isEmpty() && !clearCalendarFeed) {
+        Preferences prefs;
+        if (!prefs.begin("data", true)) {
+          request->send(500, "application/json", "{\"error\":\"Calendar settings unavailable\"}");
+          return;
+        }
+        api_server = prefs.getString("api_url", "");
+        prefs.end();
+      }
+#endif
       bool isEnterprise = data["isEnterprise"].is<bool>() && data["isEnterprise"].as<bool>();
       String band = data["band"].is<String>() ? data["band"].as<String>() : "";
       String username = data["username"].is<String>() ? data["username"].as<String>() : "";
@@ -201,7 +247,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
         Log_info("WebServer: Saved hostname: %s", hostname.c_str());
       }
 
-      Log_info("WebServer: Received SSID: %s, Static IP: %s", ssid.c_str(), useStaticIP ? "yes" : "no");
+      Log_info("WebServer: Received Wi-Fi credentials, Static IP: %s", useStaticIP ? "yes" : "no");
 
       callbacks.setConnectionCredentials(credentials, api_server, band);
       String mac = WiFi.macAddress();
