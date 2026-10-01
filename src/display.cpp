@@ -766,6 +766,9 @@ float display_battery_voltage()
         return -1.0f;
     }
     return battery().readVoltage(pDevice);
+}
+
+#ifdef BOARD_X_CLASS
 void display_draw_touchbar_indicator(touchbar_side_t side, bool filled)
 {
     const int radius = 24;

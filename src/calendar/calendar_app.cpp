@@ -139,7 +139,6 @@ bool renderIfChanged(calendar::DisplayStatus status, calendar::CalendarDate date
       return false;
     }
   }
-  }
   gLastDisplayHash = stateHash;
   gLastDisplayMarker = kDisplayHashMarker;
   Serial.println("Calendar render performed");
@@ -156,25 +155,11 @@ void enterDeepSleep(bool displayInitialized, calendar::WifiManager &wifiManager)
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
   if (pDevice != nullptr) {
     pins_init();
-    const esp_err_t keyWakeResult = esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(pDevice->interrupt_pin), 0);
+    const esp_err_t keyWakeResult =
+      esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(pDevice->interrupt_pin), 0);
     if (keyWakeResult != ESP_OK) {
       Serial.printf("KEY3 GPIO wake setup failed: %d\n", static_cast<int>(keyWakeResult));
     }
-  } else
-#ifdef PIN_INTERRUPT
-  {
-    pins_init();
-    const esp_err_t keyWakeResult = esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(PIN_INTERRUPT), 0);
-    if (keyWakeResult != ESP_OK) {
-      Serial.printf("KEY3 GPIO wake setup failed: %d\n", static_cast<int>(keyWakeResult));
-    }
-  }
-#else
-  {
-    Serial.println("KEY3 GPIO wake unavailable: board device configuration is missing");
-  }
-#endif
-#endif
   } else {
     Serial.println("KEY3 GPIO wake unavailable: board device configuration is missing");
   }
@@ -244,7 +229,7 @@ void calendar_app_setup() {
   if (pDevice != nullptr) {
     attachInterrupt(digitalPinToInterrupt(pDevice->interrupt_pin), onKey3Pressed, FALLING);
   } else {
-    attachInterrupt(digitalPinToInterrupt(PIN_INTERRUPT), onKey3Pressed, FALLING);
+    Serial.println("KEY3 manual refresh unavailable: board device configuration is missing");
   }
   preferences.end();
   Serial.printf("E-Ink Calendar firmware %s (%s), model %s, resolution %ux%u\n", FW_VERSION_STRING, FW_COMMIT,
@@ -320,11 +305,6 @@ void calendar_app_setup() {
   }
 
   if (!haveCalendarFeed) {
-    Serial.println("Private calendar feed URL is not configured");
-    renderIfChanged(calendar::DisplayStatus::CalendarFeedSetupRequired, today, nullptr, 0, batteryTenthsVolts);
-    Serial.println("Starting Wi-Fi portal for private iCalendar feed setup");
-    // start portal flow (existing code follows)
-  }
     Serial.println("Private calendar feed URL is not configured");
     renderIfChanged(calendar::DisplayStatus::CalendarFeedSetupRequired, today, nullptr, 0, batteryTenthsVolts);
     Serial.println("Starting Wi-Fi portal for private iCalendar feed setup");
