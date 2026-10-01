@@ -100,6 +100,86 @@ The board target, panel profile, and SPI pins are defined upstream in
 `platformio.ini` and `src/display.cpp`. Use the board's BOOT/download procedure
 if automatic upload mode does not start.
 
+## Host development / hardware-free testing
+
+The `calendar-host` PlatformIO environment runs the shared calendar model,
+event selection, calendar layout renderer, and `CalendarProvider` contract on
+the development machine. A native `DisplayTarget` draws into a monochrome
+framebuffer and writes an 800×480, 1-bit grayscale PNG. A small local HTTP
+server provides a settings page and lifecycle controls.
+
+Build and run from the repository root:
+
+```sh
+pio run -e calendar-host
+```
+
+The native environment requires a C++ compiler on `PATH`: MinGW-w64 (`g++`)
+on Windows, GCC/build-essential on Linux, or Xcode Command Line Tools on
+macOS. Run the deterministic host tests with:
+
+```sh
+pio test -e native_calendar
+```
+
+PlatformIO writes the executable under `.pio/build/calendar-host/`. On Windows
+it is normally `program.exe`; on Linux/macOS it is normally `program`. Run it
+from the repository root so `.dev/` paths resolve as documented:
+
+```powershell
+.\.pio\build\calendar-host\program.exe
+```
+
+```sh
+./.pio/build/calendar-host/program
+```
+
+At startup the emulator performs one refresh, then starts the local portal at
+**http://localhost:8080**. The portal lets you view/edit the calendar URL,
+refresh interval, and timezone. Saving persists settings immediately and runs
+a render. **Refresh now** runs another lifecycle iteration; **Reload settings
+and render** discards any unsaved in-memory state and reloads the persisted
+file. There is no periodic timer loop and the process never sleeps for the
+configured interval.
+
+Host files are local development state and are ignored by Git:
+
+- Settings: `.dev/calendar-settings.json`
+- Preview: `.dev/calendar-preview.png`
+
+The default URL `fixture://default` selects the built-in deterministic
+`MockCalendarProvider` fixture relative to the current local date. The fixture
+contains all-day and timed events, multiple events on a day, a long title,
+events later in the week, and a day with no events. Tests use explicitly
+injected dates and never use live Google Calendar data. A local `.ics` fixture
+can also be selected using a `file://` URL. Host mode does not fetch remote
+HTTPS URLs; attempting one displays a provider error instead of crashing.
+This keeps the emulator useful offline and avoids introducing OAuth or a
+network dependency solely for development.
+For a local Windows fixture, use a file URI such as
+`file:///C:/Users/you/Calendar/family.ics`; for Linux/macOS use
+`file:///home/you/family.ics` or the corresponding absolute path.
+
+The host app uses the same settings model and validation as the device. Host
+JSON-file persistence is an adapter that approximates reload/persistence
+behavior; it is **not an implementation of ESP32 NVS**. The device continues
+using `Preferences`/NVS for the feed URL, refresh interval, and timezone, and
+continues using its existing captive portal for Wi-Fi credentials. The same
+calendar layout function is called by the host and the embedded display
+adapter; on-device drawing still uses the existing `bb_epaper` buffer and
+`EPD_75` profile unchanged.
+
+Emulated: configuration edits/persistence, fixture or local-file provider
+flow, calendar date selection/layout, monochrome drawing, PNG output, and
+manual refresh/reload actions.
+
+Not emulated: ESP32 instruction execution, Wi-Fi provisioning or NVS internals,
+real SNTP/network failures, TLS certificate behavior for a live remote feed,
+the XIAO pin map, `bb_epaper` waveform/partial-refresh behavior, panel ghosting,
+battery readings, GPIO button wake, or actual deep-sleep current. These still
+require an embedded build and, where hardware-dependent, the physical TRMNL
+device.
+
 ## Wi-Fi setup and credential reuse
 
 The calendar uses the existing TRMNL captive portal and credential store;
@@ -142,8 +222,11 @@ the spring skipped hour and autumn repeated hour are handled by the timezone
 implementation rather than hand-coded seasonal offsets. The local date from this conversion drives Today / This Week selection.
 `MockCalendarProvider` remains available for deterministic host-side
 development; normal device execution retrieves events from the configured
-iCalendar feed. Host tests exercise the POSIX rule around both 2026
-transitions.
+iCalendar feed. Host tests exercise both 2026 UK clock transitions. Linux and
+macOS use the POSIX rule; the Windows host adapter uses the OS `GMT Standard
+Time` transition data because the MinGW C runtime does not apply the ESP-IDF
+POSIX transition rule consistently. Firmware continues using the POSIX rule
+above.
 
 ## Boot, refresh, and sleep lifecycle
 
@@ -169,9 +252,9 @@ KEY3/manual wake:
 
 The default automatic wake interval is `AUTO_REFRESH_INTERVAL_SECONDS` (12
 hours) in `include/calendar/calendar_config.h`. The existing
-`xiao_epaper_display` device-table entry supplies the interrupt pin (GPIO5);
-the calendar uses that runtime pin for active-low ESP32-S3 GPIO wake instead
-of duplicating a pin number or using the generic `PIN_INTERRUPT` macro.
+`xiao_epaper_display` board configuration supplies `PIN_INTERRUPT` (GPIO5);
+the calendar uses that existing compile-time setting for active-low ESP32-S3
+GPIO wake rather than duplicating the pin number.
 Upstream code calls this the device interrupt pin rather than naming it
 KEY3, so verify the physical KEY3-to-GPIO5 association on the assembled
 hardware. NTP server names, Wi-Fi connection timeout, timezone rule, and NTP

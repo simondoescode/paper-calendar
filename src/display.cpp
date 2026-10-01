@@ -614,11 +614,7 @@ bool display_calendar_refresh()
 
 float display_battery_voltage()
 {
-    if (pDevice == nullptr) {
-        Log_error("display_battery_voltage: board configuration is not initialized");
-        return -1.0f;
-    }
-    return battery().readVoltage(pDevice);
+    return battery().readVoltage();
 }
 
 #ifdef BOARD_X_CLASS

@@ -4,6 +4,15 @@
 #include <string.h>
 #include <time.h>
 
+#if defined(_WIN32) && defined(CALENDAR_HOST)
+#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0602
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0602
+#endif
+#include <windows.h>
+#include <stdlib.h>
+#endif
+
 namespace calendar {
 namespace {
 
@@ -38,6 +47,61 @@ int64_t eventSortKey(const CalendarEvent &event) {
   return event.allDay ? localDateTimeEpoch(event.allDayStartDate) : event.startEpoch;
 }
 
+#if defined(_WIN32) && defined(CALENDAR_HOST)
+bool hostUsesUtc() {
+  const char *timezone = getenv("TZ");
+  return timezone != nullptr && (strcmp(timezone, "UTC0") == 0 || strcmp(timezone, "UTC") == 0);
+}
+
+bool londonWindowsTimeZone(DYNAMIC_TIME_ZONE_INFORMATION &timezone) {
+  for (DWORD index = 0; EnumDynamicTimeZoneInformation(index, &timezone) == ERROR_SUCCESS; ++index) {
+    if (wcscmp(timezone.TimeZoneKeyName, L"GMT Standard Time") == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool epochToSystemTime(int64_t epoch, SYSTEMTIME &systemTime) {
+  const time_t timestamp = static_cast<time_t>(epoch);
+  if (static_cast<int64_t>(timestamp) != epoch) {
+    return false;
+  }
+  struct tm utc = {};
+  if (gmtime_s(&utc, &timestamp) != 0) {
+    return false;
+  }
+  systemTime = {};
+  systemTime.wYear = static_cast<WORD>(utc.tm_year + 1900);
+  systemTime.wMonth = static_cast<WORD>(utc.tm_mon + 1);
+  systemTime.wDay = static_cast<WORD>(utc.tm_mday);
+  systemTime.wDayOfWeek = static_cast<WORD>(utc.tm_wday);
+  systemTime.wHour = static_cast<WORD>(utc.tm_hour);
+  systemTime.wMinute = static_cast<WORD>(utc.tm_min);
+  systemTime.wSecond = static_cast<WORD>(utc.tm_sec);
+  return true;
+}
+
+bool sameWallTime(const SYSTEMTIME &left, const SYSTEMTIME &right) {
+  return left.wYear == right.wYear && left.wMonth == right.wMonth && left.wDay == right.wDay &&
+         left.wHour == right.wHour && left.wMinute == right.wMinute;
+}
+
+bool validLondonLocalTime(const DYNAMIC_TIME_ZONE_INFORMATION &timezone, CalendarDate date, unsigned hour,
+                          unsigned minute, int64_t candidateEpoch) {
+  SYSTEMTIME utc = {};
+  SYSTEMTIME local = {};
+  SYSTEMTIME expected = {};
+  expected.wYear = static_cast<WORD>(date.year);
+  expected.wMonth = static_cast<WORD>(date.month);
+  expected.wDay = static_cast<WORD>(date.day);
+  expected.wHour = static_cast<WORD>(hour);
+  expected.wMinute = static_cast<WORD>(minute);
+  return epochToSystemTime(candidateEpoch, utc) &&
+         SystemTimeToTzSpecificLocalTimeEx(&timezone, &utc, &local) != 0 && sameWallTime(local, expected);
+}
+#endif
+
 } // namespace
 
 int64_t calendarEpoch(CalendarDate date, unsigned hour, unsigned minute) {
@@ -49,6 +113,33 @@ int64_t localDateTimeEpoch(CalendarDate date, unsigned hour, unsigned minute) {
   if (date.month < 1 || date.month > 12 || date.day < 1 || date.day > 31 || hour > 23 || minute > 59) {
     return -1;
   }
+#if defined(_WIN32) && defined(CALENDAR_HOST)
+  if (hostUsesUtc()) {
+    if (compareDates(calendarDateFromEpoch(calendarEpoch(date)), date) != 0) {
+      return -1;
+    }
+    return calendarEpoch(date, hour, minute);
+  }
+  DYNAMIC_TIME_ZONE_INFORMATION timezone = {};
+  TIME_ZONE_INFORMATION yearlyRules = {};
+  if (!londonWindowsTimeZone(timezone) ||
+      !GetTimeZoneInformationForYear(static_cast<USHORT>(date.year), &timezone, &yearlyRules)) {
+    return -1;
+  }
+  const int biases[] = {yearlyRules.Bias + yearlyRules.StandardBias,
+                        yearlyRules.Bias + yearlyRules.DaylightBias};
+  int64_t validCandidates[2] = {-1, -1};
+  size_t validCount = 0;
+  for (size_t i = 0; i < 2; ++i) {
+    const int64_t candidate = calendarEpoch(date, hour, minute) +
+                              static_cast<int64_t>(biases[i]) * 60;
+    if (validLondonLocalTime(timezone, date, hour, minute, candidate) &&
+        (validCount == 0 || validCandidates[0] != candidate)) {
+      validCandidates[validCount++] = candidate;
+    }
+  }
+  return validCount == 1 ? validCandidates[0] : -1;
+#else
   struct tm local = {};
   local.tm_year = date.year - 1900;
   local.tm_mon = static_cast<int>(date.month) - 1;
@@ -95,6 +186,7 @@ int64_t localDateTimeEpoch(CalendarDate date, unsigned hour, unsigned minute) {
     return -1;
   }
   return static_cast<int64_t>(timestamp);
+#endif
 }
 
 CalendarDate calendarDateFromEpoch(int64_t epoch) {
@@ -126,6 +218,26 @@ unsigned calendarWeekday(CalendarDate date) {
 }
 
 bool localTimeFromEpoch(int64_t epoch, CalendarDate &date, unsigned &hour, unsigned &minute) {
+#if defined(_WIN32) && defined(CALENDAR_HOST)
+  SYSTEMTIME utc = {};
+  SYSTEMTIME local = {};
+  if (!epochToSystemTime(epoch, utc)) {
+    return false;
+  }
+  if (hostUsesUtc()) {
+    local = utc;
+  } else {
+    DYNAMIC_TIME_ZONE_INFORMATION timezone = {};
+    if (!londonWindowsTimeZone(timezone) ||
+        !SystemTimeToTzSpecificLocalTimeEx(&timezone, &utc, &local)) {
+      return false;
+    }
+  }
+  date = {local.wYear, local.wMonth, local.wDay};
+  hour = local.wHour;
+  minute = local.wMinute;
+  return true;
+#else
   const time_t timestamp = static_cast<time_t>(epoch);
   if (static_cast<int64_t>(timestamp) != epoch) {
     return false;
@@ -146,6 +258,7 @@ bool localTimeFromEpoch(int64_t epoch, CalendarDate &date, unsigned &hour, unsig
   hour = static_cast<unsigned>(localTime.tm_hour);
   minute = static_cast<unsigned>(localTime.tm_min);
   return true;
+#endif
 }
 
 CalendarDate calendarDateAddDays(CalendarDate date, int days) {

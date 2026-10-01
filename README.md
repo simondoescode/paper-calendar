@@ -13,6 +13,10 @@ configured through the captive portal and stored in device NVS. See
 [docs/EINK_CALENDAR.md](docs/EINK_CALENDAR.md) for the hardware reuse
 boundary, build/flash commands, architecture decision, and roadmap.
 
+For hardware-free development, build and run `calendar-host` to start a local
+settings portal and generate an 800×480 monochrome preview using offline
+fixture events. See the host development section in the calendar guide.
+
 > [!IMPORTANT]
 > the `main` branch is under constant development and may contain breaking changes. flash at your own risk.
 >

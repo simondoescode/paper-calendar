@@ -8,7 +8,7 @@ namespace calendar {
 
 class ClockService {
 public:
-  bool synchronize();
+  bool synchronize(const char *timezone = nullptr);
   bool now(int64_t &epoch, CalendarDate &localDate, unsigned &hour, unsigned &minute) const;
 };
 

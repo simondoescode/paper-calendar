@@ -40,20 +40,21 @@ size_t MockCalendarProvider::loadEvents(CalendarEvent *events, size_t capacity) 
     return 0;
   }
 
-  const CalendarDate thursday = _date;
+  const CalendarDate today = _date;
   const CalendarDate friday = calendarDateAddDays(_date, 1);
   const CalendarDate saturday = calendarDateAddDays(_date, 2);
-  const CalendarDate sunday = calendarDateAddDays(_date, 3);
+  const CalendarDate monday = calendarDateAddDays(_date, 4);
   const CalendarEvent sample[] = {
-    makeEvent("school-day", "School drop-off", thursday, 9, 0, 30, false),
-    makeEvent("lunch", "Lunch", thursday, 12, 30, 60, false),
-    makeEvent("isla-pickup", "Pick up Isla", thursday, 15, 15, 30, false),
-    makeEvent("swimming", "Swimming", thursday, 18, 0, 60, false),
+    makeEvent("school-day", "School drop-off", today, 9, 0, 30, false),
+    makeEvent("lunch", "Lunch", today, 12, 30, 60, false),
+    makeEvent("isla-pickup", "Pick up Isla", today, 15, 15, 30, false),
+    makeEvent("swimming", "Swimming", today, 18, 0, 60, false),
     makeEvent("dentist", "Dentist", friday, 10, 0, 60, false),
     makeEvent("birthday", "Birthday party with friends and family", saturday, 14, 0, 120, false),
-    makeEvent("family-lunch", "Family lunch", sunday, 11, 0, 90, false),
+    makeEvent("family-lunch", "Family lunch", monday, 11, 0, 90, false),
     makeEvent("school-closed", "School holiday", friday, 0, 0, 1440, true),
-    makeEvent("trip", "Family trip (continues)", thursday, 20, 0, 1080, false),
+    makeEvent("trip", "Family trip (continues)", today, 20, 0, 1080, false),
+    makeEvent("early-school-run", "Early school run", today, 9, 15, 45, false),
   };
 
   const size_t eventCount = sizeof(sample) / sizeof(sample[0]);

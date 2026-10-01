@@ -4,6 +4,7 @@
 #include <esp_sntp.h>
 
 #include <time.h>
+#include <string.h>
 
 namespace calendar {
 namespace {
@@ -18,10 +19,11 @@ void onTimeSynchronized(struct timeval *timeValue) {
 
 } // namespace
 
-bool ClockService::synchronize() {
+bool ClockService::synchronize(const char *timezone) {
   gTimeSynchronized = false;
   sntp_set_time_sync_notification_cb(onTimeSynchronized);
-  configTzTime(kTimezoneRule, kNtpServerPrimary, kNtpServerSecondary);
+  const char *timezoneRule = timezone != nullptr && strcmp(timezone, "UTC") == 0 ? "UTC0" : kTimezoneRule;
+  configTzTime(timezoneRule, kNtpServerPrimary, kNtpServerSecondary);
 
   const uint32_t startedAt = millis();
   while (!gTimeSynchronized && millis() - startedAt < kNtpSyncTimeoutMs) {

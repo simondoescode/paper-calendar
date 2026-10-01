@@ -1,13 +1,19 @@
 #include <calendar/calendar.h>
 #include <calendar/calendar_config.h>
+#include <calendar/calendar_renderer.h>
+#include <calendar/host_runtime.h>
 #include <calendar/icalendar_parser.h>
 #include <calendar/mock_calendar_provider.h>
+#include <calendar/settings.h>
 #include <calendar/wake_reason.h>
 #include <unity.h>
 
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <cstdio>
+#include <fstream>
+#include <memory>
 
 namespace {
 
@@ -104,7 +110,7 @@ void test_rest_of_week_excludes_today_and_ends_at_next_monday(void) {
   TEST_ASSERT_EQUAL_UINT(2, count);
   TEST_ASSERT_EQUAL_STRING("friday", selected[0].id);
   TEST_ASSERT_EQUAL_STRING("sunday", selected[1].id);
-  TEST_ASSERT_EQUAL_INT64(calendar::calendarEpoch({2026, 10, 5}), week.endEpoch);
+  TEST_ASSERT_EQUAL_INT64(calendar::localDateTimeEpoch({2026, 10, 5}), week.endEpoch);
 }
 
 void test_calendar_dates_around_london_dst_change_are_consistent(void) {
@@ -119,15 +125,15 @@ void test_calendar_dates_around_london_dst_change_are_consistent(void) {
                           calendar::calendarEpoch(autumnChange) - calendar::calendarEpoch(beforeAutumnChange));
   TEST_ASSERT_EQUAL_UINT(0, calendar::calendarWeekday(springChange));
   TEST_ASSERT_EQUAL_UINT(0, calendar::calendarWeekday(autumnChange));
-  TEST_ASSERT_EQUAL_UINT(3, calendar::calendarDateFromEpoch(calendar::calendarEpoch({2028, 2, 29})).day);
+  TEST_ASSERT_EQUAL_UINT(29, calendar::calendarDateFromEpoch(calendar::calendarEpoch({2028, 2, 29})).day);
 }
 
 void test_saturday_and_sunday_week_boundaries(void) {
   const calendar::CalendarRange saturdayRange = calendar::calendarRestOfWeekRange({2026, 10, 3});
   const calendar::CalendarRange sundayRange = calendar::calendarRestOfWeekRange({2026, 10, 4});
 
-  TEST_ASSERT_EQUAL_INT64(calendar::calendarEpoch({2026, 10, 4}), saturdayRange.startEpoch);
-  TEST_ASSERT_EQUAL_INT64(calendar::calendarEpoch({2026, 10, 5}), saturdayRange.endEpoch);
+  TEST_ASSERT_EQUAL_INT64(calendar::localDateTimeEpoch({2026, 10, 4}), saturdayRange.startEpoch);
+  TEST_ASSERT_EQUAL_INT64(calendar::localDateTimeEpoch({2026, 10, 5}), saturdayRange.endEpoch);
   TEST_ASSERT_EQUAL_INT64(sundayRange.startEpoch, sundayRange.endEpoch);
 }
 
@@ -177,6 +183,8 @@ void test_london_timezone_uses_bst_and_gmt_transition_rules(void) {
                                                 minute));
   TEST_ASSERT_EQUAL_UINT(1, hour);
   TEST_ASSERT_EQUAL_UINT(0, minute);
+  TEST_ASSERT_EQUAL_INT64(-1, calendar::localDateTimeEpoch({2026, 3, 29}, 1, 30));
+  TEST_ASSERT_EQUAL_INT64(-1, calendar::localDateTimeEpoch({2026, 10, 25}, 1, 30));
 }
 
 void test_mock_events_are_generated_relative_to_injected_date(void) {
@@ -187,10 +195,10 @@ void test_mock_events_are_generated_relative_to_injected_date(void) {
 
   const size_t count = provider.loadEvents(events, calendar::kMaxEvents);
 
-  TEST_ASSERT_EQUAL_UINT(9, count);
+  TEST_ASSERT_EQUAL_UINT(10, count);
   TEST_ASSERT_EQUAL_INT64(injectedDay + 9 * 3600, events[0].startEpoch);
   TEST_ASSERT_EQUAL_INT64(calendar::localDateTimeEpoch({2031, 12, 31}, 10), events[4].startEpoch);
-  TEST_ASSERT_EQUAL_INT64(calendar::localDateTimeEpoch({2032, 1, 2}, 11), events[6].startEpoch);
+  TEST_ASSERT_EQUAL_INT64(calendar::localDateTimeEpoch({2032, 1, 3}, 11), events[6].startEpoch);
   TEST_ASSERT_TRUE(events[7].allDay);
   TEST_ASSERT_EQUAL_INT(2031, events[7].allDayStartDate.year);
   TEST_ASSERT_EQUAL_UINT(12, events[7].allDayStartDate.month);
@@ -375,6 +383,110 @@ void test_icalendar_parser_rejects_over_capacity_visible_events(void) {
   TEST_ASSERT_TRUE(parser.error() == calendar::IcalendarError::TooManyEvents);
 }
 
+void test_host_settings_default_and_persistence_round_trip(void) {
+  const char *path = "calendar-settings-test.json";
+  remove(path);
+  std::unique_ptr<calendar::ConfigStore> store(calendar::createHostConfigStore(path));
+  calendar::CalendarSettings settings = {};
+  TEST_ASSERT_TRUE(store->load(settings));
+  TEST_ASSERT_EQUAL_STRING(calendar::kDefaultFixtureUrl, settings.calendarUrl);
+  TEST_ASSERT_EQUAL_UINT(calendar::kDefaultRefreshIntervalSeconds, settings.refreshIntervalSeconds);
+  TEST_ASSERT_EQUAL_STRING("Europe/London", settings.timezone);
+
+  strncpy(settings.calendarUrl, "file:///tmp/family.ics", sizeof(settings.calendarUrl) - 1);
+  settings.refreshIntervalSeconds = 300;
+  strncpy(settings.timezone, "UTC", sizeof(settings.timezone) - 1);
+  TEST_ASSERT_TRUE(store->save(settings));
+  store.reset(calendar::createHostConfigStore(path));
+  calendar::CalendarSettings reloaded = {};
+  TEST_ASSERT_TRUE(store->load(reloaded));
+  TEST_ASSERT_EQUAL_STRING("file:///tmp/family.ics", reloaded.calendarUrl);
+  TEST_ASSERT_EQUAL_UINT(300, reloaded.refreshIntervalSeconds);
+  TEST_ASSERT_EQUAL_STRING("UTC", reloaded.timezone);
+  remove(path);
+}
+
+void test_host_settings_form_validates_and_persists_portal_submission(void) {
+  const char *path = "calendar-settings-form-test.json";
+  remove(path);
+  std::unique_ptr<calendar::ConfigStore> store(calendar::createHostConfigStore(path));
+  calendar::CalendarSettings settings = calendar::defaultCalendarSettings();
+  char error[160];
+  const char form[] = "calendar_url=fixture%3A%2F%2Fdefault&refresh_interval=180&timezone=UTC";
+  TEST_ASSERT_TRUE(calendar::applySettingsForm(form, settings, error, sizeof(error)));
+  TEST_ASSERT_TRUE(store->save(settings));
+
+  calendar::CalendarSettings invalid = settings;
+  const char invalidForm[] = "calendar_url=http%3A%2F%2Fexample.com%2Ffeed.ics&refresh_interval=30&timezone=Mars%2FOlympus";
+  TEST_ASSERT_FALSE(calendar::applySettingsForm(invalidForm, invalid, error, sizeof(error)));
+  TEST_ASSERT_TRUE(strlen(error) > 0);
+  calendar::CalendarSettings reloaded = {};
+  TEST_ASSERT_TRUE(store->load(reloaded));
+  TEST_ASSERT_EQUAL_UINT(180, reloaded.refreshIntervalSeconds);
+  TEST_ASSERT_EQUAL_STRING("UTC", reloaded.timezone);
+  remove(path);
+}
+
+void test_host_settings_malformed_file_fails_with_safe_defaults(void) {
+  const char *path = "calendar-settings-corrupt-test.json";
+  {
+    std::ofstream file(path, std::ios::binary | std::ios::trunc);
+    file << "{ definitely not json";
+  }
+  std::unique_ptr<calendar::ConfigStore> store(calendar::createHostConfigStore(path));
+  calendar::CalendarSettings settings = {};
+  TEST_ASSERT_FALSE(store->load(settings));
+  TEST_ASSERT_EQUAL_STRING("", settings.calendarUrl);
+  TEST_ASSERT_EQUAL_UINT(calendar::kDefaultRefreshIntervalSeconds, settings.refreshIntervalSeconds);
+  remove(path);
+}
+
+void test_host_fixture_provider_renders_shared_800_by_480_png(void) {
+  const calendar::CalendarDate today = {2026, 10, 1};
+  calendar::CalendarSettings settings = calendar::defaultCalendarSettings();
+  strncpy(settings.calendarUrl, calendar::kDefaultFixtureUrl, sizeof(settings.calendarUrl) - 1);
+  calendar::HostCalendarProvider provider(settings, today);
+  calendar::CalendarEvent events[calendar::kMaxEvents] = {};
+  const size_t count = provider.loadEvents(events, calendar::kMaxEvents);
+  TEST_ASSERT_EQUAL_STRING("", provider.error());
+  TEST_ASSERT_TRUE(count > 0);
+
+  const char *path = "calendar-preview-test.png";
+  calendar::HostDisplayTarget display(path);
+  TEST_ASSERT_TRUE(calendar::renderCalendar(display, events, count, today, "test", "calendar-host", -1));
+  std::ifstream file(path, std::ios::binary);
+  unsigned char header[25] = {};
+  file.read(reinterpret_cast<char *>(header), sizeof(header));
+  TEST_ASSERT_TRUE(file.good() || file.eof());
+  TEST_ASSERT_EQUAL_UINT8(137, header[0]);
+  TEST_ASSERT_EQUAL_UINT8('P', header[1]);
+  TEST_ASSERT_EQUAL_UINT8('N', header[2]);
+  TEST_ASSERT_EQUAL_UINT8('G', header[3]);
+  TEST_ASSERT_EQUAL_UINT(800, (static_cast<uint32_t>(header[16]) << 24) |
+                                (static_cast<uint32_t>(header[17]) << 16) |
+                                (static_cast<uint32_t>(header[18]) << 8) | header[19]);
+  TEST_ASSERT_EQUAL_UINT(480, (static_cast<uint32_t>(header[20]) << 24) |
+                                (static_cast<uint32_t>(header[21]) << 16) |
+                                (static_cast<uint32_t>(header[22]) << 8) | header[23]);
+  TEST_ASSERT_EQUAL_UINT8(1, header[24]);
+  file.close();
+  remove(path);
+}
+
+void test_host_provider_error_and_missing_configuration_are_clean(void) {
+  calendar::CalendarSettings settings = calendar::defaultCalendarSettings();
+  strncpy(settings.calendarUrl, "https://calendar.example/family.ics", sizeof(settings.calendarUrl) - 1);
+  calendar::HostCalendarProvider remoteProvider(settings, {2026, 10, 1});
+  calendar::CalendarEvent events[calendar::kMaxEvents] = {};
+  TEST_ASSERT_EQUAL_UINT(0, remoteProvider.loadEvents(events, calendar::kMaxEvents));
+  TEST_ASSERT_TRUE(strlen(remoteProvider.error()) > 0);
+
+  settings.calendarUrl[0] = '\0';
+  calendar::HostCalendarProvider missingProvider(settings, {2026, 10, 1});
+  TEST_ASSERT_EQUAL_UINT(0, missingProvider.loadEvents(events, calendar::kMaxEvents));
+  TEST_ASSERT_EQUAL_STRING("Calendar URL is not configured.", missingProvider.error());
+}
+
 void setUp(void) { setLondonTimezoneForTest(); }
 void tearDown(void) {}
 
@@ -402,5 +514,10 @@ int main(int argc, char **argv) {
   RUN_TEST(test_icalendar_parser_converts_utc_events_to_london_display_time);
   RUN_TEST(test_icalendar_parser_rejects_unsupported_timezone_and_recurrence_explicitly);
   RUN_TEST(test_icalendar_parser_rejects_over_capacity_visible_events);
+  RUN_TEST(test_host_settings_default_and_persistence_round_trip);
+  RUN_TEST(test_host_settings_form_validates_and_persists_portal_submission);
+  RUN_TEST(test_host_settings_malformed_file_fails_with_safe_defaults);
+  RUN_TEST(test_host_fixture_provider_renders_shared_800_by_480_png);
+  RUN_TEST(test_host_provider_error_and_missing_configuration_are_clean);
   return UNITY_END();
 }
