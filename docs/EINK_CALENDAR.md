@@ -179,7 +179,6 @@ the XIAO pin map, `bb_epaper` waveform/partial-refresh behavior, panel ghosting,
 battery readings, GPIO button wake, or actual deep-sleep current. These still
 require an embedded build and, where hardware-dependent, the physical TRMNL
 device.
-
 ## Wi-Fi setup and credential reuse
 
 The calendar uses the existing TRMNL captive portal and credential store;
@@ -252,9 +251,9 @@ KEY3/manual wake:
 
 The default automatic wake interval is `AUTO_REFRESH_INTERVAL_SECONDS` (12
 hours) in `include/calendar/calendar_config.h`. The existing
-`xiao_epaper_display` board configuration supplies `PIN_INTERRUPT` (GPIO5);
-the calendar uses that existing compile-time setting for active-low ESP32-S3
-GPIO wake rather than duplicating the pin number.
+`xiao_epaper_display` device-table entry supplies the interrupt pin (GPIO5);
+the calendar uses that runtime pin for active-low ESP32-S3 GPIO wake instead
+of duplicating a pin number or using the generic `PIN_INTERRUPT` macro.
 Upstream code calls this the device interrupt pin rather than naming it
 KEY3, so verify the physical KEY3-to-GPIO5 association on the assembled
 hardware. NTP server names, Wi-Fi connection timeout, timezone rule, and NTP

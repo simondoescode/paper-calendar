@@ -487,6 +487,7 @@ void test_host_provider_error_and_missing_configuration_are_clean(void) {
   TEST_ASSERT_EQUAL_STRING("Calendar URL is not configured.", missingProvider.error());
 }
 
+
 void setUp(void) { setLondonTimezoneForTest(); }
 void tearDown(void) {}
 

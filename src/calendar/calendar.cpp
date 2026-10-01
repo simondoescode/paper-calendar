@@ -12,7 +12,6 @@
 #include <windows.h>
 #include <stdlib.h>
 #endif
-
 namespace calendar {
 namespace {
 
@@ -101,7 +100,6 @@ bool validLondonLocalTime(const DYNAMIC_TIME_ZONE_INFORMATION &timezone, Calenda
          SystemTimeToTzSpecificLocalTimeEx(&timezone, &utc, &local) != 0 && sameWallTime(local, expected);
 }
 #endif
-
 } // namespace
 
 int64_t calendarEpoch(CalendarDate date, unsigned hour, unsigned minute) {

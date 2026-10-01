@@ -23,8 +23,17 @@
 #include <stdlib.h>
 #include <memory>
 
+extern TRMNL_DEVICE *pDevice;
+
 namespace {
 
+const char *const kWeekdayNames[] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
+const char *const kMonthNames[] = {"JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+                                   "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
+const char *const kFullWeekdayNames[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
+                                         "Saturday"};
+const char *const kFullMonthNames[] = {"January", "February", "March", "April", "May", "June",
+                                       "July", "August", "September", "October", "November", "December"};
 RTC_DATA_ATTR uint32_t gLastDisplayHash = 0;
 RTC_DATA_ATTR uint32_t gLastDisplayMarker = 0;
 RTC_NOINIT_ATTR volatile uint32_t gPendingManualRefreshMarker;
@@ -130,6 +139,7 @@ bool renderIfChanged(calendar::DisplayStatus status, calendar::CalendarDate date
       return false;
     }
   }
+  }
   gLastDisplayHash = stateHash;
   gLastDisplayMarker = kDisplayHashMarker;
   Serial.println("Calendar render performed");
@@ -144,10 +154,27 @@ void enterDeepSleep(bool displayInitialized, calendar::WifiManager &wifiManager)
   const uint64_t sleepMicros = static_cast<uint64_t>(gRefreshIntervalSeconds) * 1000000ULL;
   esp_sleep_enable_timer_wakeup(sleepMicros);
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
-  pins_init();
-  const esp_err_t keyWakeResult = esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(PIN_INTERRUPT), 0);
-  if (keyWakeResult != ESP_OK) {
-    Serial.printf("KEY3 GPIO wake setup failed: %d\n", static_cast<int>(keyWakeResult));
+  if (pDevice != nullptr) {
+    pins_init();
+    const esp_err_t keyWakeResult = esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(pDevice->interrupt_pin), 0);
+    if (keyWakeResult != ESP_OK) {
+      Serial.printf("KEY3 GPIO wake setup failed: %d\n", static_cast<int>(keyWakeResult));
+    }
+  } else
+#ifdef PIN_INTERRUPT
+  {
+    pins_init();
+    const esp_err_t keyWakeResult = esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(PIN_INTERRUPT), 0);
+    if (keyWakeResult != ESP_OK) {
+      Serial.printf("KEY3 GPIO wake setup failed: %d\n", static_cast<int>(keyWakeResult));
+    }
+  }
+#else
+  {
+    Serial.println("KEY3 GPIO wake unavailable: board device configuration is missing");
+  }
+#endif
+#endif
   } else {
     Serial.println("KEY3 GPIO wake unavailable: board device configuration is missing");
   }
@@ -214,7 +241,11 @@ void calendar_app_setup() {
       wifiManager.clearSavedCredentials();
     }
   }
-  attachInterrupt(digitalPinToInterrupt(PIN_INTERRUPT), onKey3Pressed, FALLING);
+  if (pDevice != nullptr) {
+    attachInterrupt(digitalPinToInterrupt(pDevice->interrupt_pin), onKey3Pressed, FALLING);
+  } else {
+    attachInterrupt(digitalPinToInterrupt(PIN_INTERRUPT), onKey3Pressed, FALLING);
+  }
   preferences.end();
   Serial.printf("E-Ink Calendar firmware %s (%s), model %s, resolution %ux%u\n", FW_VERSION_STRING, FW_COMMIT,
                 DEVICE_MODEL, static_cast<unsigned>(display_width()), static_cast<unsigned>(display_height()));
@@ -279,7 +310,21 @@ void calendar_app_setup() {
   }
   Serial.printf("London local time: %04d-%02u-%02u %02u:%02u\n", today.year, today.month, today.day, hour, minute);
 
-  if (calendarSettings.calendarUrl[0] == '\0') {
+  char calendarFeedUrl[512] = {};
+  bool haveCalendarFeed = false;
+  if (wifiManager.getCalendarFeedUrl(calendarFeedUrl, sizeof(calendarFeedUrl))) {
+    haveCalendarFeed = true;
+  } else if (calendarSettings.calendarUrl[0] != '\0') {
+    strncpy(calendarFeedUrl, calendarSettings.calendarUrl, sizeof(calendarFeedUrl) - 1);
+    haveCalendarFeed = true;
+  }
+
+  if (!haveCalendarFeed) {
+    Serial.println("Private calendar feed URL is not configured");
+    renderIfChanged(calendar::DisplayStatus::CalendarFeedSetupRequired, today, nullptr, 0, batteryTenthsVolts);
+    Serial.println("Starting Wi-Fi portal for private iCalendar feed setup");
+    // start portal flow (existing code follows)
+  }
     Serial.println("Private calendar feed URL is not configured");
     renderIfChanged(calendar::DisplayStatus::CalendarFeedSetupRequired, today, nullptr, 0, batteryTenthsVolts);
     Serial.println("Starting Wi-Fi portal for private iCalendar feed setup");
@@ -294,7 +339,7 @@ void calendar_app_setup() {
     today,
     calendar::calendarRestOfWeekRange(today).endDate,
   };
-  calendar::IcalendarFeedProvider provider(calendarSettings.calendarUrl, feedRange);
+  calendar::IcalendarFeedProvider provider(calendarFeedUrl, feedRange);
   calendar::CalendarEvent events[calendar::kMaxEvents] = {};
   const size_t eventCount = provider.loadEvents(events, calendar::kMaxEvents);
   if (provider.error() != calendar::IcalendarError::None) {
