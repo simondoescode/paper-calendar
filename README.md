@@ -2,6 +2,17 @@
 
 created for the [TRMNL](https://trmnl.com) e-ink display.
 
+## Self-hosted calendar fork
+
+This fork is being adapted into a standalone family calendar for the TRMNL
+BYOD 7.5-inch OG DIY Kit. It reuses the upstream display driver, Wi-Fi
+provisioning, and board configuration to show a local Today / This Week
+calendar using London time, with periodic deep sleep and KEY3 manual refresh.
+Calendar data is retrieved directly from a private HTTPS iCalendar feed,
+configured through the captive portal and stored in device NVS. See
+[docs/EINK_CALENDAR.md](docs/EINK_CALENDAR.md) for the hardware reuse
+boundary, build/flash commands, architecture decision, and roadmap.
+
 > [!IMPORTANT]
 > the `main` branch is under constant development and may contain breaking changes. flash at your own risk.
 >

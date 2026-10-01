@@ -748,6 +748,8 @@
     }
   </style>
   <script>
+    var calendarMode = false;
+
     function setRefreshButtonState(scanning) {
       var btn = document.getElementById('btnRefresh');
       if (scanning && document.activeElement === btn) btn.blur();
@@ -782,7 +784,7 @@
       var server = document.getElementById('server').value;
       var band = document.getElementById('band').value;
       var isEnterprise = document.getElementById('isEnterpriseHidden').value === 'true';
-
+      var clearCalendarFeed = calendarMode && document.getElementById('clearCalendarFeed').checked;
       if (!ssid) {
         displayAlert('Please enter your Wi-Fi name');
         return;
@@ -799,27 +801,32 @@
       // if the server field carries a value, validate the url
       if (server) {
         try {
-          new URL(server);
-
-          if (!server.startsWith('http://') && !server.startsWith('https://')) {
+          var parsedServer = new URL(server);
+          if (calendarMode && (parsedServer.protocol !== 'https:' || !parsedServer.pathname.toLowerCase().endsWith('.ics'))) {
+            throw new Error();
+          }
+          if (!calendarMode && !server.startsWith('http://') && !server.startsWith('https://')) {
             throw new Error();
           }
         } catch (_) {
           location.hash = '#advanced';
-          displayAdvancedAlert('Please enter a valid URL for your custom server');
+          displayAdvancedAlert(calendarMode
+            ? 'Enter the full private iCalendar feed URL ending in .ics; HTTPS is required.'
+            : 'Please enter a valid URL for your custom server');
           return;
         }
       }
 
       server = server.trim();
-      server = server.replace(/\/+$/, '');
+      if (!calendarMode) server = server.replace(/\/+$/, '');
 
       var body = {
         ssid: ssid,
         pswd: pswd,
         server: server,
         band: band,
-        isEnterprise: isEnterprise
+        isEnterprise: isEnterprise,
+        clearCalendarFeed: clearCalendarFeed
       };
 
       if (isEnterprise) {
@@ -1092,8 +1099,22 @@
     async function loadServerFromDevice() {
       try {
         const response = await fetch('/device-settings');
-        const server = (await response.json()).api_url;
-        if (server) document.getElementById('server').value = server;
+        const settings = await response.json();
+        calendarMode = settings.calendar_mode === true;
+        if (calendarMode) {
+          document.querySelector('label[for="server"]').textContent = 'Private iCalendar feed URL';
+          document.querySelector('#server').type = 'password';
+          document.querySelector('#server').placeholder = settings.calendar_feed_configured
+            ? 'Saved privately; enter a new URL to replace'
+            : 'https://calendar.google.com/calendar/ical/.../basic.ics';
+          document.querySelector('#server').autocomplete = 'new-password';
+          document.querySelector('#server-hint').textContent =
+            'Paste Google Calendar’s private iCalendar address. Anyone with this URL can read the calendar.';
+          document.getElementById('clearCalendarFeed').closest('.field').hidden =
+            !settings.calendar_feed_configured;
+        } else if (settings.api_url) {
+          document.getElementById('server').value = settings.api_url;
+        }
       } catch (_) { }
     }
 
@@ -1366,7 +1387,11 @@
         <div class="field">
           <label for="server">API server</label>
           <input class="inp" type="url" id="server" name="server" placeholder="https://trmnl.app">
-          <p class="hint">Point your TRMNL at your own server (BYOS).</p>
+          <p class="hint" id="server-hint">Point your TRMNL at your own server (BYOS).</p>
+          <label class="switch" id="clear-calendar-feed-row" hidden>
+            <input type="checkbox" id="clearCalendarFeed">
+            Clear the saved private calendar feed URL
+          </label>
         </div>
       </div>
 

@@ -194,7 +194,7 @@ bool WifiCaptive::startPortal() {
         res = _modemConnectCallback(credentials.ssid, credentials.pswd);
         if (res) connected_via_modem = true;
       } else {
-        auto result = initiateConnectionAndWaitForOutcome(credentials);
+        auto result = initiateConnectionAndWaitForOutcome(credentials, _connectionTimeoutMs);
         res = result.status == WL_CONNECTED;
         if (!res) failureState = classifyConnectionFailure(result);
       }
@@ -232,7 +232,7 @@ bool WifiCaptive::startPortal() {
       }
       Log_info("Reconnecting with static IP: %s, IP: %s", credentials.useStaticIP ? "yes" : "no",
                credentials.staticIP.c_str());
-      auto result = initiateConnectionAndWaitForOutcome(credentials);
+      auto result = initiateConnectionAndWaitForOutcome(credentials, _connectionTimeoutMs);
       status = result.status;
     }
   }
@@ -265,8 +265,12 @@ bool WifiCaptive::startPortal() {
     saveShipmentStarted();
     enter_shipment_sleep();
 #else
-    showMessageWithLogo(CAPTIVE_WIFI_TIMEOUT);
-    goToSleep();
+    if (_portalTimeoutCallback) {
+      _portalTimeoutCallback();
+    } else {
+      showMessageWithLogo(CAPTIVE_WIFI_TIMEOUT);
+      goToSleep();
+    }
 #endif
   }
   return succesfullyConnected;
@@ -326,7 +330,7 @@ wl_status_t WifiCaptive::connect(const WifiCredentials credentials) {
   if (credentials.ssid != "") {
     WiFi.enableSTA(true);
 
-    auto result = initiateConnectionAndWaitForOutcome(credentials);
+    auto result = initiateConnectionAndWaitForOutcome(credentials, _connectionTimeoutMs);
     connRes = result.status;
   }
 
@@ -336,6 +340,12 @@ wl_status_t WifiCaptive::connect(const WifiCredentials credentials) {
 void WifiCaptive::setResetSettingsCallback(std::function<void()> func) { _resetcallback = func; }
 
 void WifiCaptive::setPortalTickCallback(std::function<void()> func) { _tickCallback = func; }
+
+void WifiCaptive::setPortalTimeoutCallback(std::function<void()> callback) { _portalTimeoutCallback = callback; }
+
+void WifiCaptive::setConnectionTimeout(uint32_t timeoutMs) {
+  _connectionTimeoutMs = timeoutMs;
+}
 
 void WifiCaptive::setHostname(const String &hostname) { _hostname = hostname; }
 
@@ -374,7 +384,7 @@ void WifiCaptive::readWifiCredentials() {
 }
 
 void WifiCaptive::saveWifiCredentials(const WifiCredentials credentials) {
-  Log_info("Saving wifi credentials: %s (Enterprise: %s)", credentials.ssid.c_str(),
+  Log_info("Saving Wi-Fi credentials (Enterprise: %s)",
            credentials.isEnterprise ? "yes" : "no");
 
   // Check if the credentials already exist
@@ -583,7 +593,7 @@ std::vector<WifiNetwork> WifiCaptive::getScannedUniqueNetworks(bool runScan) {
 
   Log_info("Unique networks found: %d", uniqueWifiNetworks.size());
   for (auto &network : uniqueWifiNetworks) {
-    Log_info("SSID: %s, RSSI: %d, Open: %d, Band: %s", network.ssid.c_str(), network.rssi, network.open,
+    Log_info("Wi-Fi network scan result (RSSI: %d, Open: %d, Band: %s)", network.rssi, network.open,
              (network.is5GHz) ? "5GHz" : "2.4GHz");
   }
 
@@ -651,7 +661,7 @@ bool WifiCaptive::autoConnect() {
   int last_used_index = readLastUsedWifiIndex();
 
   if (_savedWifis[last_used_index].ssid != "") {
-    Log_info("Trying to connect to last used %s...", _savedWifis[last_used_index].ssid.c_str());
+    Log_info("Trying to connect to last used saved Wi-Fi network...");
     WiFi.setSleep(0);
     WiFi.setMinSecurity(WIFI_AUTH_OPEN);
     WiFi.mode(WIFI_STA);
@@ -676,7 +686,7 @@ bool WifiCaptive::autoConnect() {
       continue;
     }
 
-    Log_info("Trying to connect to saved network %s...", network.ssid.c_str());
+    Log_info("Trying to connect to another saved Wi-Fi network...");
     if (tryConnectWithRetries(network, found_index)) {
       return true;
     }
@@ -688,11 +698,11 @@ bool WifiCaptive::autoConnect() {
 
 bool WifiCaptive::tryConnectWithRetries(const WifiCredentials creds, int last_used_index) {
   for (int attempt = 0; attempt < WIFI_CONNECTION_ATTEMPTS; attempt++) {
-    Log_info("Attempt %d to connect to %s (Enterprise: %s, Static IP: %s, IP: %s)", attempt + 1, creds.ssid.c_str(),
-             creds.isEnterprise ? "yes" : "no", creds.useStaticIP ? "yes" : "no", creds.staticIP.c_str());
+    Log_info("Wi-Fi connection attempt %d (Enterprise: %s, Static IP: %s)", attempt + 1,
+             creds.isEnterprise ? "yes" : "no", creds.useStaticIP ? "yes" : "no");
     connect(creds);
     if (WiFi.status() == WL_CONNECTED) {
-      Log_info("Connected to %s", creds.ssid.c_str());
+      Log_info("Connected to saved Wi-Fi network");
       if (last_used_index >= 0) {
         saveLastUsedWifiIndex(last_used_index);
       }
@@ -739,7 +749,7 @@ void WifiCaptive::setModemScanCallback(ModemScanCallback cb) { _modemScanCallbac
 #endif
 
 bool findNetwork(const char *ssid, int32_t *rssi_out) {
-  Log_info("Scanning for network: %s", ssid);
+  Log_info("Scanning for configured Wi-Fi network");
 
   WiFi.mode(WIFI_STA);
   int n = WiFi.scanNetworks(false);
@@ -749,14 +759,14 @@ bool findNetwork(const char *ssid, int32_t *rssi_out) {
     return false;
   }
 
-  Log_info("Found %d networks, searching for %s", n, ssid);
+  Log_info("Found %d networks, checking for configured network", n);
 
   for (int i = 0; i < n; ++i) {
     String scannedSSID = WiFi.SSID(i);
 
     if (scannedSSID == ssid) {
       int32_t rssi = WiFi.RSSI(i);
-      Log_info("Found %s! RSSI: %d dBm", ssid, rssi);
+      Log_info("Configured Wi-Fi network found (RSSI: %d dBm)", rssi);
 
       if (rssi_out) {
         *rssi_out = rssi;
@@ -767,7 +777,7 @@ bool findNetwork(const char *ssid, int32_t *rssi_out) {
     }
   }
 
-  Log_info("Network '%s' not found", ssid);
+  Log_info("Configured Wi-Fi network not found");
   WiFi.scanDelete();
   return false;
 }

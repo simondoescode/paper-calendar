@@ -5,7 +5,16 @@
 #include "power.h"
 #include "qa.h"
 
-#ifdef BOARD_TRMNL_X
+#if defined(EINK_CALENDAR_APP)
+#include "calendar/calendar_app.h"
+
+void setup() {
+  Serial.begin(115200);
+  esp_ota_mark_app_valid_cancel_rollback();
+  calendar_app_setup();
+}
+
+#elif defined(BOARD_TRMNL_X)
 #include "display.h"
 #include "esp_sleep.h"
 #include "filesystem.h"
@@ -77,4 +86,8 @@ void setup() {
 }
 #endif // !BOARD_TRMNL_X
 
-void loop() { bl_process(); }
+void loop() {
+#if !defined(EINK_CALENDAR_APP)
+  bl_process();
+#endif
+}
