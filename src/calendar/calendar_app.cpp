@@ -46,13 +46,40 @@ void IRAM_ATTR onKey3Pressed() { gPendingManualRefreshMarker = kPendingManualRef
 class EpaperDisplayTarget : public calendar::DisplayTarget {
 public:
   bool begin() override { return display_calendar_begin(); }
-  void text(uint16_t x, uint16_t y, const char *value, uint8_t size) override {
-    display_calendar_text(x, y, value, size);
+  void text(uint16_t x, uint16_t y, const char *value, uint8_t size, calendar::DisplayColor foreground,
+            calendar::DisplayColor background) override {
+    display_calendar_text(x, y, value, size, color(foreground), backgroundColor(background));
   }
-  void line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2) override {
-    display_calendar_line(x1, y1, x2, y2);
+  uint16_t textWidth(const char *value, uint8_t size) override {
+    return display_calendar_text_width(value, size);
+  }
+  uint8_t fontHeight(uint8_t size) override { return display_calendar_font_height(size); }
+  void line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, calendar::DisplayColor lineColor) override {
+    display_calendar_line(x1, y1, x2, y2, color(lineColor));
+  }
+  void fillRect(uint16_t x, uint16_t y, uint16_t width, uint16_t height,
+                calendar::DisplayColor fill) override {
+    display_calendar_fill_rect(x, y, width, height, color(fill));
+  }
+  void roundRect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint8_t radius,
+                 calendar::DisplayColor fill, calendar::DisplayColor border) override {
+    display_calendar_round_rect(x, y, width, height, radius, color(fill), color(border));
+  }
+  void circle(uint16_t x, uint16_t y, uint16_t radius, calendar::DisplayColor circleColor,
+              bool filled) override {
+    display_calendar_circle(x, y, radius, color(circleColor), filled);
   }
   bool refresh() override { return display_calendar_refresh(); }
+
+private:
+  static uint8_t color(calendar::DisplayColor value) {
+    if (value == calendar::DisplayColor::White) return 1;
+    if (value == calendar::DisplayColor::LightGrey) return 2;
+    return 0;
+  }
+  static uint8_t backgroundColor(calendar::DisplayColor value) {
+    return value == calendar::DisplayColor::LightGrey ? 255 : color(value);
+  }
 };
 
 bool drawCalendar(const calendar::CalendarEvent *events, size_t count, calendar::CalendarDate date,

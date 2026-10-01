@@ -6,6 +6,12 @@
 #include <calendar/calendar_renderer.h>
 #include <calendar/icalendar_parser.h>
 #include <calendar/mock_calendar_provider.h>
+#include "host_font_decoder/Group5.h"
+#include <fonts/Manrope_Bold_35.h>
+#include <fonts/Manrope_Bold_19.h>
+#include <fonts/Manrope_Medium_10.h>
+#include <fonts/Manrope_Medium_11.h>
+#include <fonts/Manrope_SemiBold_14.h>
 
 #include <algorithm>
 #include <array>
@@ -130,60 +136,6 @@ std::vector<uint8_t> encodePng(const std::vector<uint8_t> &pixels) {
   return png;
 }
 
-std::array<uint8_t, 5> glyph(char character) {
-  if (character >= 'a' && character <= 'z') {
-    character = static_cast<char>(character - 'a' + 'A');
-  }
-  switch (character) {
-  case 'A': return {{0x7e, 0x11, 0x11, 0x11, 0x7e}};
-  case 'B': return {{0x7f, 0x49, 0x49, 0x49, 0x36}};
-  case 'C': return {{0x3e, 0x41, 0x41, 0x41, 0x22}};
-  case 'D': return {{0x7f, 0x41, 0x41, 0x22, 0x1c}};
-  case 'E': return {{0x7f, 0x49, 0x49, 0x49, 0x41}};
-  case 'F': return {{0x7f, 0x09, 0x09, 0x09, 0x01}};
-  case 'G': return {{0x3e, 0x41, 0x49, 0x49, 0x7a}};
-  case 'H': return {{0x7f, 0x08, 0x08, 0x08, 0x7f}};
-  case 'I': return {{0x00, 0x41, 0x7f, 0x41, 0x00}};
-  case 'J': return {{0x20, 0x40, 0x41, 0x3f, 0x01}};
-  case 'K': return {{0x7f, 0x08, 0x14, 0x22, 0x41}};
-  case 'L': return {{0x7f, 0x40, 0x40, 0x40, 0x40}};
-  case 'M': return {{0x7f, 0x02, 0x0c, 0x02, 0x7f}};
-  case 'N': return {{0x7f, 0x04, 0x08, 0x10, 0x7f}};
-  case 'O': return {{0x3e, 0x41, 0x41, 0x41, 0x3e}};
-  case 'P': return {{0x7f, 0x09, 0x09, 0x09, 0x06}};
-  case 'Q': return {{0x3e, 0x41, 0x51, 0x21, 0x5e}};
-  case 'R': return {{0x7f, 0x09, 0x19, 0x29, 0x46}};
-  case 'S': return {{0x46, 0x49, 0x49, 0x49, 0x31}};
-  case 'T': return {{0x01, 0x01, 0x7f, 0x01, 0x01}};
-  case 'U': return {{0x3f, 0x40, 0x40, 0x40, 0x3f}};
-  case 'V': return {{0x1f, 0x20, 0x40, 0x20, 0x1f}};
-  case 'W': return {{0x3f, 0x40, 0x38, 0x40, 0x3f}};
-  case 'X': return {{0x63, 0x14, 0x08, 0x14, 0x63}};
-  case 'Y': return {{0x07, 0x08, 0x70, 0x08, 0x07}};
-  case 'Z': return {{0x61, 0x51, 0x49, 0x45, 0x43}};
-  case '0': return {{0x3e, 0x51, 0x49, 0x45, 0x3e}};
-  case '1': return {{0x00, 0x42, 0x7f, 0x40, 0x00}};
-  case '2': return {{0x42, 0x61, 0x51, 0x49, 0x46}};
-  case '3': return {{0x21, 0x41, 0x45, 0x4b, 0x31}};
-  case '4': return {{0x18, 0x14, 0x12, 0x7f, 0x10}};
-  case '5': return {{0x27, 0x45, 0x45, 0x45, 0x39}};
-  case '6': return {{0x3c, 0x4a, 0x49, 0x49, 0x30}};
-  case '7': return {{0x01, 0x71, 0x09, 0x05, 0x03}};
-  case '8': return {{0x36, 0x49, 0x49, 0x49, 0x36}};
-  case '9': return {{0x06, 0x49, 0x49, 0x29, 0x1e}};
-  case ':': return {{0x00, 0x36, 0x36, 0x00, 0x00}};
-  case '.': return {{0x00, 0x60, 0x60, 0x00, 0x00}};
-  case ',': return {{0x00, 0x40, 0x20, 0x00, 0x00}};
-  case '-': return {{0x08, 0x08, 0x08, 0x08, 0x08}};
-  case '_': return {{0x40, 0x40, 0x40, 0x40, 0x40}};
-  case '/': return {{0x20, 0x10, 0x08, 0x04, 0x02}};
-  case '|': return {{0x00, 0x00, 0x7f, 0x00, 0x00}};
-  case '\'': return {{0x00, 0x05, 0x03, 0x00, 0x00}};
-  case '(': return {{0x00, 0x1c, 0x22, 0x41, 0x00}};
-  case ')': return {{0x00, 0x41, 0x22, 0x1c, 0x00}};
-  default: return {{0, 0, 0, 0, 0}};
-  }
-}
 
 CalendarDate hostLocalDate() {
   const time_t now = time(nullptr);
@@ -342,41 +294,100 @@ bool HostDisplayTarget::begin() {
   return true;
 }
 
-void HostDisplayTarget::text(uint16_t x, uint16_t y, const char *value, uint8_t size) {
-  if (value == nullptr || _impl == nullptr) return;
-  const uint8_t scale = size >= 24 ? 3 : (size >= 16 ? 2 : 1);
-  const uint8_t horizontalAdvance = size >= 24 ? 18 : (size >= 16 ? 9 : 6);
-  uint16_t cursorX = x;
-  for (const unsigned char *character = reinterpret_cast<const unsigned char *>(value);
-       *character != '\0' && cursorX < kWidth; ++character) {
-    if (*character >= 128) {
-      cursorX = static_cast<uint16_t>(cursorX + 6 * scale);
-      continue;
-    }
-    const std::array<uint8_t, 5> pattern = glyph(static_cast<char>(*character));
-    for (uint8_t column = 0; column < pattern.size(); ++column) {
-      const uint16_t columnX = size >= 16 && size < 24
-                                 ? static_cast<uint16_t>(cursorX + (column * 3) / 2)
-                                 : static_cast<uint16_t>(cursorX + column * scale);
-      for (uint8_t row = 0; row < 7; ++row) {
-        if ((pattern[column] & (1u << row)) == 0) continue;
-        const uint8_t horizontalScale = size >= 16 && size < 24 ? 1 : scale;
-        for (uint8_t dx = 0; dx < horizontalScale; ++dx) {
-          for (uint8_t dy = 0; dy < scale; ++dy) {
-            const uint16_t px = static_cast<uint16_t>(columnX + dx);
-            const uint16_t py = static_cast<uint16_t>(y + row * scale + dy);
-            if (px < kWidth && py < kHeight) {
-              _impl->pixels[static_cast<size_t>(py) * kWidth + px] = 0;
-            }
-          }
-        }
-      }
-    }
-    cursorX = static_cast<uint16_t>(cursorX + horizontalAdvance);
+namespace {
+void setHostPixel(std::vector<uint8_t> &pixels, int x, int y, DisplayColor color) {
+  if (x < 0 || x >= kWidth || y < 0 || y >= kHeight) return;
+  const bool black = color == DisplayColor::Black ||
+                     (color == DisplayColor::LightGrey && ((x + 2 * y) & 3) == 0);
+  pixels[static_cast<size_t>(y) * kWidth + x] = black ? 0 : 1;
+}
+
+const uint8_t *hostCalendarFont(uint8_t size) {
+  switch (size) {
+  case kCalendarFontMain: return Manrope_Bold_35;
+  case kCalendarFontHeading: return Manrope_Bold_19;
+  case kCalendarFontTitle: return Manrope_SemiBold_14;
+  case kCalendarFontMetadata: return Manrope_Medium_11;
+  case kCalendarFontFooter: return Manrope_Medium_10;
+  default: return Manrope_Medium_11;
   }
 }
 
-void HostDisplayTarget::line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2) {
+uint16_t fontWord(const uint8_t *value) {
+  return static_cast<uint16_t>(value[0] | (static_cast<uint16_t>(value[1]) << 8));
+}
+
+uint8_t glyphAdvance(const uint8_t *font, unsigned char character) {
+  const uint16_t first = fontWord(font + 2);
+  const uint16_t last = fontWord(font + 4);
+  if (character < first || character > last) return 0;
+  return font[12 + static_cast<size_t>(character - first) * 8 + 3];
+}
+} // namespace
+
+void HostDisplayTarget::text(uint16_t x, uint16_t y, const char *value, uint8_t size,
+                             DisplayColor foreground, DisplayColor background) {
+  if (value == nullptr || _impl == nullptr) return;
+  const uint8_t *font = hostCalendarFont(size);
+  const uint16_t first = fontWord(font + 2);
+  const uint16_t last = fontWord(font + 4);
+  const size_t bitmapStart = 12 + (last - first + 1) * 8;
+  uint16_t cursorX = x;
+  for (const unsigned char *character = reinterpret_cast<const unsigned char *>(value);
+       *character != '\0' && cursorX < kWidth; ++character) {
+    if (*character < first || *character > last) continue;
+    const uint8_t *metrics = font + 12 + (*character - first) * 8;
+    const uint8_t width = metrics[2];
+    const uint8_t height = metrics[4];
+    const int left = static_cast<int>(cursorX) + static_cast<int8_t>(metrics[5]);
+    const int top = static_cast<int>(y) + static_cast<int8_t>(metrics[6]);
+    if (width > 0 && height > 0) {
+      const uint16_t offset = fontWord(metrics);
+      // The decoder reads ahead by a word. Pad the bounded glyph stream so
+      // the last glyph never reads beyond the font array.
+      const size_t fontBytes = size == kCalendarFontMain ? sizeof(Manrope_Bold_35)
+          : size == kCalendarFontHeading ? sizeof(Manrope_Bold_19)
+          : size == kCalendarFontTitle ? sizeof(Manrope_SemiBold_14)
+          : size == kCalendarFontFooter ? sizeof(Manrope_Medium_10) : sizeof(Manrope_Medium_11);
+      const size_t end = *character < last ? bitmapStart + fontWord(metrics + 8) : fontBytes;
+      const size_t start = bitmapStart + offset;
+      if (end <= start || end > fontBytes) continue;
+      std::vector<uint8_t> compressed(font + start, font + end);
+      compressed.resize(compressed.size() + 4, 0);
+      G5DECODER decoder;
+      std::array<uint8_t, 32> row = {};
+      if (decoder.init(width, height, compressed.data(), static_cast<int>(compressed.size())) != G5_SUCCESS) continue;
+      for (uint16_t rowY = 0; rowY < height; ++rowY) {
+        const int result = decoder.decodeLine(row.data());
+        if (result != G5_SUCCESS && result != G5_DECODE_COMPLETE) break;
+        for (uint16_t column = 0; column < width; ++column) {
+          const bool ink = (row[column / 8] & (0x80u >> (column & 7))) != 0;
+          setHostPixel(_impl->pixels, left + column, top + rowY, ink ? foreground : background);
+        }
+      }
+    }
+    cursorX = static_cast<uint16_t>(cursorX + glyphAdvance(font, *character));
+  }
+}
+
+uint16_t HostDisplayTarget::textWidth(const char *value, uint8_t size) {
+  if (value == nullptr) return 0;
+  const uint8_t *font = hostCalendarFont(size);
+  uint16_t width = 0;
+  for (const unsigned char *character = reinterpret_cast<const unsigned char *>(value);
+       *character != '\0'; ++character) {
+    width = static_cast<uint16_t>(width + glyphAdvance(font, *character));
+  }
+  return width;
+}
+
+uint8_t HostDisplayTarget::fontHeight(uint8_t size) {
+  const uint8_t *font = hostCalendarFont(size);
+  const size_t index = 'H' - fontWord(font + 2);
+  return static_cast<uint8_t>(-static_cast<int8_t>(font[12 + index * 8 + 6]));
+}
+
+void HostDisplayTarget::line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, DisplayColor color) {
   if (_impl == nullptr) return;
   int x = x1;
   int y = y1;
@@ -387,12 +398,51 @@ void HostDisplayTarget::line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2)
   int error = dx + dy;
   while (true) {
     if (x >= 0 && x < kWidth && y >= 0 && y < kHeight) {
-      _impl->pixels[static_cast<size_t>(y) * kWidth + x] = 0;
+      setHostPixel(_impl->pixels, x, y, color);
     }
     if (x == x2 && y == y2) break;
     const int twiceError = 2 * error;
     if (twiceError >= dy) { error += dy; x += sx; }
     if (twiceError <= dx) { error += dx; y += sy; }
+  }
+}
+
+void HostDisplayTarget::fillRect(uint16_t x, uint16_t y, uint16_t width, uint16_t height,
+                                 DisplayColor color) {
+  if (_impl == nullptr) return;
+  for (int py = y; py < static_cast<int>(y + height); ++py) {
+    for (int px = x; px < static_cast<int>(x + width); ++px) setHostPixel(_impl->pixels, px, py, color);
+  }
+}
+
+void HostDisplayTarget::roundRect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint8_t radius,
+                                  DisplayColor fill, DisplayColor border) {
+  if (_impl == nullptr || width == 0 || height == 0) return;
+  for (int py = y; py < static_cast<int>(y + height); ++py) {
+    for (int px = x; px < static_cast<int>(x + width); ++px) {
+      const int nearestX = px < x + radius ? x + radius : (px >= x + width - radius ? x + width - radius - 1 : px);
+      const int nearestY = py < y + radius ? y + radius : (py >= y + height - radius ? y + height - radius - 1 : py);
+      const int dx = px - nearestX;
+      const int dy = py - nearestY;
+      if (dx * dx + dy * dy > radius * radius) continue;
+      const bool edge = px == x || py == y || px == x + width - 1 || py == y + height - 1 ||
+                        dx * dx + dy * dy >= (radius - 1) * (radius - 1);
+      setHostPixel(_impl->pixels, px, py, edge ? border : fill);
+    }
+  }
+}
+
+void HostDisplayTarget::circle(uint16_t x, uint16_t y, uint16_t radius, DisplayColor color, bool filled) {
+  if (_impl == nullptr) return;
+  const int r2 = radius * radius;
+  const int inner = radius > 1 ? (radius - 2) * (radius - 2) : 0;
+  for (int py = static_cast<int>(y) - radius; py <= static_cast<int>(y) + radius; ++py) {
+    for (int px = static_cast<int>(x) - radius; px <= static_cast<int>(x) + radius; ++px) {
+      const int dx = px - x;
+      const int dy = py - y;
+      const int distance = dx * dx + dy * dy;
+      if (distance <= r2 && (filled || distance >= inner)) setHostPixel(_impl->pixels, px, py, color);
+    }
   }
 }
 

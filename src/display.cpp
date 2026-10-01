@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <display.h>
+#include <calendar/display_target.h>
 #include <power.h>
 #include <PNGdec.h>
 #include <JPEGDEC.h>
@@ -134,6 +135,11 @@ extern BQ27427 lipo; // Use lipo.[] to interact with the library in an Arduino
 #include "fonts/nicoclean_8.h"
 #include "fonts/Inter_18.h"
 #include "fonts/Roboto_Black_24.h"
+#include "fonts/Manrope_Bold_35.h"
+#include "fonts/Manrope_Bold_19.h"
+#include "fonts/Manrope_SemiBold_14.h"
+#include "fonts/Manrope_Medium_11.h"
+#include "fonts/Manrope_Medium_10.h"
 #include <globals.h>
 static uint8_t *pDither;
 
@@ -715,17 +721,24 @@ bool display_calendar_begin()
 #endif
 }
 
-void display_calendar_text(uint16_t x, uint16_t y, const char *text, uint8_t font_size)
+static const uint8_t *display_calendar_font(uint8_t font_size)
+{
+    switch (font_size) {
+    case calendar::kCalendarFontMain: return Manrope_Bold_35;
+    case calendar::kCalendarFontHeading: return Manrope_Bold_19;
+    case calendar::kCalendarFontTitle: return Manrope_SemiBold_14;
+    case calendar::kCalendarFontMetadata: return Manrope_Medium_11;
+    case calendar::kCalendarFontFooter: return Manrope_Medium_10;
+    default: return Manrope_Medium_11;
+    }
+}
+
+void display_calendar_text(uint16_t x, uint16_t y, const char *text, uint8_t font_size, uint8_t foreground,
+                           uint8_t background)
 {
 #ifdef BB_EPAPER
-    const uint8_t *font = Inter_18;
-    if (font_size == 8) {
-        font = nicoclean_8;
-    } else if (font_size == 24) {
-        font = Roboto_Black_24;
-    }
-    bbep.setFont(font);
-    bbep.setTextColor(BBEP_BLACK, BBEP_WHITE);
+    bbep.setFont(display_calendar_font(font_size));
+    bbep.setTextColor(foreground, background);
     bbep.setCursor(x, y);
     bbep.print(text);
 #else
@@ -733,18 +746,87 @@ void display_calendar_text(uint16_t x, uint16_t y, const char *text, uint8_t fon
     (void)y;
     (void)text;
     (void)font_size;
+    (void)foreground;
+    (void)background;
 #endif
 }
 
-void display_calendar_line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2)
+uint16_t display_calendar_text_width(const char *text, uint8_t font_size)
 {
 #ifdef BB_EPAPER
-    bbep.drawLine(x1, y1, x2, y2, BBEP_BLACK);
+    if (text == nullptr) return 0;
+    bbep.setFont(display_calendar_font(font_size));
+    BB_RECT bounds = {};
+    bbep.getStringBox(text, &bounds);
+    return bounds.w > 0 ? static_cast<uint16_t>(bounds.w) : 0;
+#else
+    (void)text;
+    (void)font_size;
+    return 0;
+#endif
+}
+
+uint8_t display_calendar_font_height(uint8_t font_size)
+{
+#ifdef BB_EPAPER
+    const BB_FONT_SMALL *font = reinterpret_cast<const BB_FONT_SMALL *>(display_calendar_font(font_size));
+    // The baseline uses the actual capital height, not the converter's
+    // much larger line advance (which includes additional leading).
+    const unsigned index = 'H' - pgm_read_word(&font->first);
+    return static_cast<uint8_t>(-static_cast<int8_t>(pgm_read_byte(&font->glyphs[index].yOffset)));
+#else
+    (void)font_size;
+    return 0;
+#endif
+}
+
+void display_calendar_line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint8_t color)
+{
+#ifdef BB_EPAPER
+    bbep.drawLine(x1, y1, x2, y2, color);
 #else
     (void)x1;
     (void)y1;
     (void)x2;
     (void)y2;
+    (void)color;
+#endif
+}
+
+void display_calendar_fill_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint8_t color)
+{
+#ifdef BB_EPAPER
+    if (color <= BBEP_WHITE) {
+        bbep.fillRect(x, y, width, height, color);
+    } else {
+        for (uint16_t py = y; py < y + height; py++) {
+            for (uint16_t px = x; px < x + width; px++) {
+                if (((px + 2 * py) & 3) == 0) bbep.drawPixel(px, py, BBEP_BLACK);
+            }
+        }
+    }
+#else
+    (void)x; (void)y; (void)width; (void)height; (void)color;
+#endif
+}
+
+void display_calendar_round_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint8_t radius,
+                                 uint8_t fill, uint8_t border)
+{
+#ifdef BB_EPAPER
+    bbep.fillRoundRect(x, y, width, height, radius, fill);
+    bbep.drawRoundRect(x, y, width, height, radius, border);
+#else
+    (void)x; (void)y; (void)width; (void)height; (void)radius; (void)fill; (void)border;
+#endif
+}
+
+void display_calendar_circle(uint16_t x, uint16_t y, uint16_t radius, uint8_t color, bool filled)
+{
+#ifdef BB_EPAPER
+    if (filled) bbep.fillCircle(x, y, radius, color); else bbep.drawCircle(x, y, radius, color);
+#else
+    (void)x; (void)y; (void)radius; (void)color; (void)filled;
 #endif
 }
 

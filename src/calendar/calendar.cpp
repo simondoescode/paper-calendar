@@ -52,8 +52,27 @@ bool hostUsesUtc() {
   return timezone != nullptr && (strcmp(timezone, "UTC0") == 0 || strcmp(timezone, "UTC") == 0);
 }
 
+DWORD enumDynamicTimeZoneInformation(DWORD index, DYNAMIC_TIME_ZONE_INFORMATION *timezone) {
+  typedef DWORD(WINAPI * EnumFunction)(DWORD, PDYNAMIC_TIME_ZONE_INFORMATION);
+  static const EnumFunction function = reinterpret_cast<EnumFunction>(
+      GetProcAddress(GetModuleHandleA("kernel32.dll"), "EnumDynamicTimeZoneInformation"));
+  return function == nullptr ? ERROR_CALL_NOT_IMPLEMENTED : function(index, timezone);
+}
+
+BOOL systemTimeToLocal(const DYNAMIC_TIME_ZONE_INFORMATION *timezone, const SYSTEMTIME *utc,
+                       SYSTEMTIME *local) {
+  typedef BOOL(WINAPI * ConvertFunction)(const DYNAMIC_TIME_ZONE_INFORMATION *, const SYSTEMTIME *, LPSYSTEMTIME);
+  static const ConvertFunction function = reinterpret_cast<ConvertFunction>(
+      GetProcAddress(GetModuleHandleA("kernel32.dll"), "SystemTimeToTzSpecificLocalTimeEx"));
+  return function != nullptr && function(timezone, utc, local);
+}
+
 bool londonWindowsTimeZone(DYNAMIC_TIME_ZONE_INFORMATION &timezone) {
-  for (DWORD index = 0; EnumDynamicTimeZoneInformation(index, &timezone) == ERROR_SUCCESS; ++index) {
+  if (GetDynamicTimeZoneInformation(&timezone) != TIME_ZONE_ID_INVALID &&
+      wcscmp(timezone.TimeZoneKeyName, L"GMT Standard Time") == 0) {
+    return true;
+  }
+  for (DWORD index = 0; enumDynamicTimeZoneInformation(index, &timezone) == ERROR_SUCCESS; ++index) {
     if (wcscmp(timezone.TimeZoneKeyName, L"GMT Standard Time") == 0) {
       return true;
     }
@@ -97,7 +116,7 @@ bool validLondonLocalTime(const DYNAMIC_TIME_ZONE_INFORMATION &timezone, Calenda
   expected.wHour = static_cast<WORD>(hour);
   expected.wMinute = static_cast<WORD>(minute);
   return epochToSystemTime(candidateEpoch, utc) &&
-         SystemTimeToTzSpecificLocalTimeEx(&timezone, &utc, &local) != 0 && sameWallTime(local, expected);
+         systemTimeToLocal(&timezone, &utc, &local) != 0 && sameWallTime(local, expected);
 }
 #endif
 } // namespace
@@ -227,7 +246,7 @@ bool localTimeFromEpoch(int64_t epoch, CalendarDate &date, unsigned &hour, unsig
   } else {
     DYNAMIC_TIME_ZONE_INFORMATION timezone = {};
     if (!londonWindowsTimeZone(timezone) ||
-        !SystemTimeToTzSpecificLocalTimeEx(&timezone, &utc, &local)) {
+        !systemTimeToLocal(&timezone, &utc, &local)) {
       return false;
     }
   }
