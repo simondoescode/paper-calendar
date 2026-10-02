@@ -134,7 +134,7 @@ namespace calendar {
 
     void drawTodayCard(DisplayTarget &display, uint16_t y, const CalendarEvent &event, int64_t dayStart) {
       const uint16_t height = event.allDay ? kTodayAllDayCardHeight : kTodayCardHeight;
-      const DisplayColor background = event.allDay ? CalendarPatterns::Sidebar : CalendarColors::Background;
+      const DisplayColor background = event.allDay ? CalendarColors::Sidebar : CalendarColors::Background;
       display.roundRect(kOuterPadding, y, kMainContentWidth, height, kCardRadius, background, CalendarColors::Border);
       display.line(122, event.allDay ? y : y + 12, 122, event.allDay ? y + height - 1 : y + height - 12);
       char time[12];
@@ -195,7 +195,7 @@ namespace calendar {
           weekday[letter] += 'a' - 'A';
         display.text(centerX - display.textWidth(weekday, kCalendarFontFooter) / 2,
                      baselineFromTop(display, 51, kCalendarFontFooter), weekday, kCalendarFontFooter,
-                     CalendarColors::Foreground, CalendarPatterns::Sidebar);
+                     CalendarColors::Foreground, CalendarColors::Sidebar);
         WeatherIcons::draw(display, getWeatherIcon(weather.forecast[i].condition, true),
                            centerX - WeatherIcons::FORECAST_SIZE / 2, 72, WeatherIcons::FORECAST_SIZE);
       }
@@ -217,12 +217,12 @@ namespace calendar {
 
     void drawLater(DisplayTarget &display, const CalendarEvent *events, size_t count, CalendarDate date,
                    const WeatherData &weather) {
-      display.fillRect(kLeftColumnWidth, 0, kRightColumnWidth, kDisplayHeight, CalendarPatterns::Sidebar);
+      display.fillRect(kLeftColumnWidth, 0, kRightColumnWidth, kDisplayHeight, CalendarColors::Sidebar);
       const uint8_t headingFont = display.textWidth("Later this week", kCalendarFontHeading) <= kSidebarContentWidth
                                     ? kCalendarFontHeading
                                     : kCalendarFontTitle;
       display.text(kSidebarX, baselineFromTop(display, 17, headingFont), "Later this week", headingFont,
-                   CalendarColors::Foreground, CalendarPatterns::Sidebar);
+                   CalendarColors::Foreground, CalendarColors::Sidebar);
       drawForecast(display, weather);
 
       const CalendarRange laterRange = calendarRestOfWeekRange(date);
@@ -243,7 +243,7 @@ namespace calendar {
       }
       if (laterCount == 0)
         display.text(kSidebarX + 16, 155, "No upcoming events", kCalendarFontFooter, CalendarColors::Foreground,
-                     CalendarPatterns::Sidebar);
+                     CalendarColors::Sidebar);
     }
 
     void drawWifiIcon(DisplayTarget &display, uint16_t x, uint16_t y, bool connected) {
