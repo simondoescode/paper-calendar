@@ -5,8 +5,17 @@ import io
 import gzip
 
 allowed_suffix = [".html", ".svg"]
-path = os.path.dirname(os.path.realpath(__file__))
-output_dir = os.path.join(path, '../src')
+
+# PlatformIO/SCons executes extra_scripts without defining __file__.
+# Resolve the portal directory from PROJECT_DIR there, while keeping
+# direct execution of this script working as before.
+if "Import" in globals():
+    Import("env")
+    path = os.path.join(env.subst("$PROJECT_DIR"), "lib", "wificaptive", "portal")
+else:
+    path = os.path.dirname(os.path.realpath(__file__))
+
+output_dir = os.path.normpath(os.path.join(path, "../src"))
 files = os.listdir(path)
 
 def gzip_file(file_path):
