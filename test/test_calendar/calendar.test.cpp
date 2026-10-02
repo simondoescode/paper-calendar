@@ -641,6 +641,50 @@ void test_host_provider_error_and_missing_configuration_are_clean(void) {
 }
 
 
+void test_today_timed_glyph_bounds_are_centered() {
+  class CheckedDisplay : public calendar::HostDisplayTarget {
+  public:
+    CheckedDisplay() : HostDisplayTarget(".dev/timed-alignment-preview.png") {}
+    void roundRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint8_t r,
+                   calendar::DisplayColor fill, calendar::DisplayColor border) override {
+      if (x == 16 && h == 72) cardY = y;
+      HostDisplayTarget::roundRect(x, y, w, h, r, fill, border);
+    }
+    void text(uint16_t x, uint16_t y, const char *value, uint8_t font,
+              calendar::DisplayColor fg, calendar::DisplayColor bg) override {
+      if ((x == 29 || x == 140) && y >= 128 && y < 448) {
+        if (cardY == 292 && x == 140) {
+          TEST_ASSERT_EQUAL_UINT(cardY + (font == calendar::kCalendarFontTitle ? 17 : 43) + fontHeight(font), y);
+          ++metadataLines;
+        } else {
+          const auto bounds = textVerticalBounds(value, font);
+          const int topGap = y + bounds.top - cardY;
+          const int bottomGap = cardY + 72 - (y + bounds.top + bounds.height);
+          TEST_ASSERT_INT_WITHIN(1, topGap, bottomGap);
+          ++centeredItems;
+        }
+      }
+      HostDisplayTarget::text(x, y, value, font, fg, bg);
+    }
+    uint16_t cardY = 0;
+    unsigned centeredItems = 0, metadataLines = 0;
+  } display;
+  const calendar::CalendarDate date = {2026, 10, 2};
+  const auto range = calendar::calendarTodayRange(date);
+  calendar::CalendarEvent events[] = {
+    eventAt("short", range.startEpoch + 45000, range.startEpoch + 46800),
+    eventAt("long", range.startEpoch + 54900, range.startEpoch + 56700),
+    eventAt("metadata", range.startEpoch + 60000, range.startEpoch + 61800),
+  };
+  snprintf(events[0].title, sizeof(events[0].title), "DUMP RUN");
+  snprintf(events[1].title, sizeof(events[1].title), "Pick up Isla after school");
+  snprintf(events[2].title, sizeof(events[2].title), "With metadata");
+  snprintf(events[2].location, sizeof(events[2].location), "School entrance");
+  TEST_ASSERT_TRUE(calendar::renderCalendar(display, events, 3, date, "test", "host", -1));
+  TEST_ASSERT_EQUAL_UINT(5, display.centeredItems);
+  TEST_ASSERT_EQUAL_UINT(2, display.metadataLines);
+}
+
 void test_today_groups_all_day_cards_and_preserves_text_backgrounds() {
   class CheckedDisplay : public calendar::HostDisplayTarget {
   public:
@@ -663,12 +707,25 @@ void test_today_groups_all_day_cards_and_preserves_text_backgrounds() {
         TEST_ASSERT_EQUAL_UINT(calendar::CalendarColors::Foreground, fg);
         TEST_ASSERT_EQUAL_UINT(fills.back(), bg);
         if (x == 29) {
-          TEST_ASSERT_EQUAL_UINT(cardY + (cardHeight + fontHeight(font)) / 2, y);
+          if (cardHeight == 48) {
+            TEST_ASSERT_EQUAL_UINT(cardY + (cardHeight + fontHeight(font)) / 2, y);
+          } else {
+            const auto bounds = textVerticalBounds(value, font);
+            const int topGap = y + bounds.top - cardY;
+            const int bottomGap = cardY + cardHeight - (y + bounds.top + bounds.height);
+            TEST_ASSERT_INT_WITHIN(1, topGap, bottomGap);
+          }
           times.emplace_back(value);
         }
         if (x == 140 && font == calendar::kCalendarFontTitle) {
-          TEST_ASSERT_EQUAL_UINT(cardHeight == 48 ? cardY + (cardHeight + fontHeight(font)) / 2
-                                                : cardY + 17 + fontHeight(font), y);
+          if (cardHeight == 48) {
+            TEST_ASSERT_EQUAL_UINT(cardY + (cardHeight + fontHeight(font)) / 2, y);
+          } else {
+            const auto bounds = textVerticalBounds(value, font);
+            const int topGap = y + bounds.top - cardY;
+            const int bottomGap = cardY + cardHeight - (y + bounds.top + bounds.height);
+            TEST_ASSERT_INT_WITHIN(1, topGap, bottomGap);
+          }
           titles.emplace_back(value);
         }
       }
@@ -804,6 +861,7 @@ int main(int argc, char **argv) {
   UNITY_BEGIN();
   RUN_TEST(test_range_selection_sorts_events_by_start);
   RUN_TEST(test_today_groups_all_day_cards_and_preserves_text_backgrounds);
+  RUN_TEST(test_today_timed_glyph_bounds_are_centered);
   RUN_TEST(test_range_selection_keeps_earliest_events_when_capacity_is_limited);
   RUN_TEST(test_today_range_includes_overlapping_events);
   RUN_TEST(test_rest_of_week_excludes_today_and_ends_at_next_monday);

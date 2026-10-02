@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <display.h>
 #include <calendar/display_target.h>
+#include <calendar/font_text_bounds.h>
 #include <power.h>
 #include <PNGdec.h>
 #include <JPEGDEC.h>
@@ -778,6 +779,18 @@ uint8_t display_calendar_font_height(uint8_t font_size)
 #else
     (void)font_size;
     return 0;
+#endif
+}
+
+calendar::TextVerticalBounds display_calendar_text_vertical_bounds(const char *text, uint8_t font_size)
+{
+#ifdef BB_EPAPER
+    return calendar::smallFontTextVerticalBounds(display_calendar_font(font_size), text,
+                                                [](const uint8_t *p) { return pgm_read_byte(p); });
+#else
+    (void)text;
+    (void)font_size;
+    return {0, 0};
 #endif
 }
 

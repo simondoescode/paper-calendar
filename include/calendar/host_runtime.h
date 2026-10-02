@@ -29,6 +29,7 @@ public:
             DisplayColor background) override;
   uint16_t textWidth(const char *value, uint8_t size) override;
   uint8_t fontHeight(uint8_t size) override;
+  TextVerticalBounds textVerticalBounds(const char *value, uint8_t size) override;
   void line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, DisplayColor color) override;
   void fillRect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, DisplayColor color) override;
   void roundRect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint8_t radius,

@@ -34,6 +34,11 @@ constexpr uint8_t kCalendarFontFooter = 11;
 // Status text shares the compact Manrope Medium bitmap used by the footer.
 constexpr uint8_t kCalendarFontStatus = 12;
 
+struct TextVerticalBounds {
+  int16_t top; // Relative to the drawing baseline.
+  uint16_t height;
+};
+
 class DisplayTarget {
 public:
   virtual ~DisplayTarget() = default;
@@ -44,6 +49,9 @@ public:
   virtual uint16_t textWidth(const char *value, uint8_t size) = 0;
   // Capital glyph height above the baseline, excluding converter leading.
   virtual uint8_t fontHeight(uint8_t size) = 0;
+  virtual TextVerticalBounds textVerticalBounds(const char *, uint8_t size) {
+    return {static_cast<int16_t>(-fontHeight(size)), fontHeight(size)};
+  }
   virtual void line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2,
                     DisplayColor color = DisplayColor::Black) = 0;
   virtual void fillRect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, DisplayColor color) = 0;

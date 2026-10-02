@@ -57,6 +57,9 @@ public:
     return display_calendar_text_width(value, size);
   }
   uint8_t fontHeight(uint8_t size) override { return display_calendar_font_height(size); }
+  calendar::TextVerticalBounds textVerticalBounds(const char *value, uint8_t size) override {
+    return display_calendar_text_vertical_bounds(value, size);
+  }
   void line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, calendar::DisplayColor lineColor) override {
     display_calendar_line(x1, y1, x2, y2, color(lineColor));
   }

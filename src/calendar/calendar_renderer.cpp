@@ -80,6 +80,12 @@ uint16_t baselineFromTop(DisplayTarget &display, uint16_t top, uint8_t font) {
   return static_cast<uint16_t>(top + display.fontHeight(font));
 }
 
+uint16_t centeredTextBaseline(DisplayTarget &display, uint16_t y, uint16_t height,
+                              const char *text, uint8_t font) {
+  const TextVerticalBounds bounds = display.textVerticalBounds(text, font);
+  return static_cast<uint16_t>(y + (static_cast<int>(height) - bounds.height) / 2 - bounds.top);
+}
+
 void fitText(DisplayTarget &display, const char *source, char *output, size_t outputSize,
              uint8_t font, uint16_t maxWidth) {
   if (outputSize == 0) return;
@@ -135,11 +141,16 @@ void drawTodayCard(DisplayTarget &display, uint16_t y, const CalendarEvent &even
   formatEventTime(event, dayStart, time, sizeof(time));
   fitText(display, event.title, title, sizeof(title), kCalendarFontTitle, kTodayTextWidth);
   fitText(display, secondaryText(event), detail, sizeof(detail), kCalendarFontFooter, kTodayTextWidth);
-  display.text(29, static_cast<uint16_t>(y + (height + display.fontHeight(kCalendarFontMetadata)) / 2),
+  const bool singleLineTimed = !event.allDay && detail[0] == '\0';
+  const uint16_t timeBaseline = singleLineTimed
+      ? centeredTextBaseline(display, y, height, time, kCalendarFontMetadata)
+      : static_cast<uint16_t>(y + (height + display.fontHeight(kCalendarFontMetadata)) / 2);
+  display.text(29, timeBaseline,
                time, kCalendarFontMetadata, CalendarColors::Foreground, background);
   const uint16_t titleBaseline = event.allDay
       ? static_cast<uint16_t>(y + (height + display.fontHeight(kCalendarFontTitle)) / 2)
-      : baselineFromTop(display, y + 17, kCalendarFontTitle);
+      : singleLineTimed ? centeredTextBaseline(display, y, height, title, kCalendarFontTitle)
+                        : baselineFromTop(display, y + 17, kCalendarFontTitle);
   display.text(kTodayTextX, titleBaseline, title, kCalendarFontTitle,
                CalendarColors::Foreground, background);
   if (!event.allDay && detail[0] != '\0') {

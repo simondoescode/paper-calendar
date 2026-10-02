@@ -2,6 +2,7 @@
 #define DISPLAY_H
 
 #include <Arduino.h>
+namespace calendar { struct TextVerticalBounds; }
 #ifndef _NO_DEV_CONFIG_
 #include "config.h"
 #endif
@@ -126,6 +127,7 @@ void display_calendar_text(uint16_t x, uint16_t y, const char *text, uint8_t fon
                            uint8_t background = 1);
 uint16_t display_calendar_text_width(const char *text, uint8_t font_size);
 uint8_t display_calendar_font_height(uint8_t font_size);
+calendar::TextVerticalBounds display_calendar_text_vertical_bounds(const char *text, uint8_t font_size);
 void display_calendar_line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint8_t color = 0);
 void display_calendar_fill_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint8_t color);
 void display_calendar_round_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint8_t radius,

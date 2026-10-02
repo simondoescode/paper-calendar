@@ -1,4 +1,5 @@
 #include <calendar/host_runtime.h>
+#include <calendar/font_text_bounds.h>
 
 #if defined(CALENDAR_HOST)
 
@@ -532,6 +533,11 @@ uint16_t HostDisplayTarget::textWidth(const char *value, uint8_t size) {
     width = static_cast<uint16_t>(width + glyphAdvance(font, *character));
   }
   return width;
+}
+
+TextVerticalBounds HostDisplayTarget::textVerticalBounds(const char *value, uint8_t size) {
+  return smallFontTextVerticalBounds(hostCalendarFont(size), value,
+                                    [](const uint8_t *p) { return *p; });
 }
 
 uint8_t HostDisplayTarget::fontHeight(uint8_t size) {
