@@ -198,7 +198,7 @@ bool installFirmware(const Manifest &manifest) {
 
   mbedtls_sha256_context sha;
   mbedtls_sha256_init(&sha);
-  if (mbedtls_sha256_starts(&sha, 0) != 0) {
+  if (mbedtls_sha256_starts_ret(&sha, 0) != 0) {
     Update.abort();
     http.end();
     mbedtls_sha256_free(&sha);
@@ -235,7 +235,7 @@ bool installFirmware(const Manifest &manifest) {
     }
     lastDataAt = millis();
 
-    if (mbedtls_sha256_update(&sha, buffer, static_cast<size_t>(received)) != 0 ||
+    if (mbedtls_sha256_update_ret(&sha, buffer, static_cast<size_t>(received)) != 0 ||
         Update.write(buffer, static_cast<size_t>(received)) != static_cast<size_t>(received)) {
       failed = true;
       break;
@@ -244,7 +244,7 @@ bool installFirmware(const Manifest &manifest) {
   }
 
   unsigned char digest[32] = {};
-  const bool hashFinished = mbedtls_sha256_finish(&sha, digest) == 0;
+  const bool hashFinished = mbedtls_sha256_finish_ret(&sha, digest) == 0;
   mbedtls_sha256_free(&sha);
   http.end();
 
