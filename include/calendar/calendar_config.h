@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// London defaults; override both via calendar-target build flags for your location.
+// Fallback weather location. Calendar builds can override this in the setup portal or via build flags.
 #ifndef WEATHER_LATITUDE
 #define WEATHER_LATITUDE 51.5074
 #endif
