@@ -707,14 +707,46 @@ uint16_t display_width()
     return bbep.width();
 }
 
+static bool display_calendar_select_grayscale_panel()
+{
+#ifdef BB_EPAPER
+    if (pDevice == nullptr) {
+        Log_error("display_calendar_begin: board configuration is not initialized");
+        return false;
+    }
+    const uint32_t panelType = dpList[pDevice->panel_set][iTempProfile].TwoBit;
+    if (bbep.getPanelType() == panelType) {
+        return true;
+    }
+    if (pDevice->epd_mosi_pin != 0 || pDevice->epd_sck_pin != 0) {
+        if (bbep.setPanelType(panelType) != BBEP_SUCCESS) {
+            Log_error("display_calendar_begin: failed to select 4-gray panel profile");
+            return false;
+        }
+        bbep.initIO(pDevice->epd_dc_pin, pDevice->epd_rst_pin, pDevice->epd_busy_pin, pDevice->epd_cs_pin,
+                    pDevice->epd_mosi_pin, pDevice->epd_sck_pin, 8000000);
+    } else if (bbep.begin(panelType) != BBEP_SUCCESS) {
+        Log_error("display_calendar_begin: failed to initialize 4-gray panel profile");
+        return false;
+    }
+    Log_info("Calendar display using 4-gray panel profile %lu", static_cast<unsigned long>(panelType));
+    return true;
+#else
+    return false;
+#endif
+}
+
 bool display_calendar_begin()
 {
 #ifdef BB_EPAPER
-    if (bbep.allocBuffer(false) != BBEP_SUCCESS) {
-        Log_error("display_calendar_begin: failed to allocate e-paper buffer");
+    if (!display_calendar_select_grayscale_panel()) {
         return false;
     }
-    bbep.fillScreen(BBEP_WHITE);
+    if (bbep.allocBuffer(false) != BBEP_SUCCESS) {
+        Log_error("display_calendar_begin: failed to allocate two-plane e-paper buffer");
+        return false;
+    }
+    bbep.fillScreen(BBEP_GRAY3);
     return true;
 #else
     Log_error("display_calendar_begin: calendar drawing requires an SPI e-paper panel");
@@ -822,15 +854,7 @@ void display_calendar_line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, u
 void display_calendar_fill_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint8_t color)
 {
 #ifdef BB_EPAPER
-    if (color <= BBEP_WHITE) {
-        bbep.fillRect(x, y, width, height, color);
-    } else if (color == calendar::CalendarPatterns::kSidebarToken) {
-        for (uint16_t py = y; py < y + height; py++) {
-            for (uint16_t px = x; px < x + width; px++) {
-                if (calendar::CalendarPatterns::sidebarInk(px, py)) bbep.drawPixel(px, py, BBEP_BLACK);
-            }
-        }
-    }
+    bbep.fillRect(x, y, width, height, color);
 #else
     (void)x; (void)y; (void)width; (void)height; (void)color;
 #endif
@@ -840,25 +864,7 @@ void display_calendar_round_rect(uint16_t x, uint16_t y, uint16_t width, uint16_
                                  uint8_t fill, uint8_t border)
 {
 #ifdef BB_EPAPER
-    if (fill == calendar::CalendarPatterns::kSidebarToken) {
-        bbep.fillRoundRect(x, y, width, height, radius, BBEP_WHITE);
-        // Clip the shared sidebar halftone to the rounded shape, then redraw
-        // the driver's border. No extra framebuffer or native grey mode.
-        for (int py = y; py < static_cast<int>(y + height); ++py) {
-            const int nearestY = py < y + radius ? y + radius :
-                (py >= y + height - radius ? y + height - radius - 1 : py);
-            for (int px = x; px < static_cast<int>(x + width); ++px) {
-                const int nearestX = px < x + radius ? x + radius :
-                    (px >= x + width - radius ? x + width - radius - 1 : px);
-                const int dx = px - nearestX;
-                const int dy = py - nearestY;
-                if (dx * dx + dy * dy <= radius * radius && calendar::CalendarPatterns::sidebarInk(px, py))
-                    bbep.drawPixel(px, py, BBEP_BLACK);
-            }
-        }
-    } else {
-        bbep.fillRoundRect(x, y, width, height, radius, fill);
-    }
+    bbep.fillRoundRect(x, y, width, height, radius, fill);
     bbep.drawRoundRect(x, y, width, height, radius, border);
 #else
     (void)x; (void)y; (void)width; (void)height; (void)radius; (void)fill; (void)border;
@@ -877,7 +883,8 @@ void display_calendar_circle(uint16_t x, uint16_t y, uint16_t radius, uint8_t co
 bool display_calendar_refresh()
 {
 #ifdef BB_EPAPER
-    const bool refreshed = display_update_epaper(REFRESH_FULL, true, true, PLANE_0);
+    const int refreshMode = bbep.hasFastRefresh() ? REFRESH_FAST : REFRESH_FULL;
+    const bool refreshed = display_update_epaper(refreshMode, true, true, PLANE_BOTH);
     bbep.freeBuffer();
     return refreshed;
 #else
