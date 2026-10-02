@@ -6,7 +6,7 @@ The device connects directly to Wi-Fi, reads calendar data from a private HTTPS 
 
 ## Features
 
-- 800×480 monochrome e-paper calendar UI
+- 800×480 four-level grayscale e-paper calendar UI
 - Today and upcoming events
 - All-day and timed event layouts
 - Private HTTPS iCalendar / ICS feed support
@@ -30,7 +30,7 @@ Primary supported target:
 
 - TRMNL BYOD 7.5-inch OG DIY Kit
 - Seeed XIAO ESP32-S3
-- 7.5-inch 800×480 monochrome e-paper display
+- 7.5-inch 800×480 black-and-white e-paper display with four-level grayscale waveforms
 
 PlatformIO environment:
 
@@ -360,9 +360,9 @@ The project also retains selected upstream TRMNL source and libraries used by th
 
 ## Display
 
-The current target uses the existing `EPD_75` profile and `bb_epaper` driver for an 800×480 monochrome panel.
+The current target uses the existing `EPD_75` panel family and `bb_epaper` driver. Calendar rendering switches to the driver's matching `TwoBit` / `EP75_800x480_4GRAY` profile, allocating two 1-bit planes to produce four physical grayscale states.
 
-The calendar UI uses a black-and-white display palette with dithering where a light-grey visual treatment is required.
+The calendar palette exposes black, dark grey, light grey and white. The right-hand sidebar and all-day cards use native light grey rather than a black-pixel dither pattern. The host preview is also written as a 2-bit grayscale PNG so desktop rendering matches the firmware palette.
 
 ## Power
 
