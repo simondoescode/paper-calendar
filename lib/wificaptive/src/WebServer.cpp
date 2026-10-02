@@ -106,8 +106,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
     const bool configured = apiUrl.length() > 0;
     prefs.end();
     request->send(200, "application/json",
-                  String("{\"calendar_mode\":true,\"calendar_feed_configured\":") +
-                    (configured ? "true}" : "false}"));
+                  String("{\"calendar_mode\":true,\"calendar_feed_configured\":") + (configured ? "true}" : "false}"));
 #else
     prefs.end();
     apiUrl.replace("\\", "\\\\");
@@ -198,8 +197,7 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
       String pswd = data["pswd"];
       String api_server = data["server"];
 #ifdef EINK_CALENDAR_APP
-      const bool clearCalendarFeed =
-        data["clearCalendarFeed"].is<bool>() && data["clearCalendarFeed"].as<bool>();
+      const bool clearCalendarFeed = data["clearCalendarFeed"].is<bool>() && data["clearCalendarFeed"].as<bool>();
       api_server.trim();
       if (!api_server.isEmpty() && !isCalendarFeedUrlValid(api_server)) {
         request->send(400, "application/json", "{\"error\":\"A valid HTTPS .ics feed URL is required\"}");

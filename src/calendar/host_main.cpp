@@ -6,88 +6,87 @@
 #include <calendar/weather_client.h>
 #include <fstream>
 #include <iterator>
-#include <string>
-
+#include <memory>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <string>
 #include <time.h>
-
-#include <memory>
 
 namespace {
 
-calendar::CalendarDate localToday() {
-  calendar::CalendarDate today = {};
-  unsigned hour = 0;
-  unsigned minute = 0;
-  if (!calendar::localTimeFromEpoch(static_cast<int64_t>(time(nullptr)), today, hour, minute)) {
-    return {};
-  }
-  return today;
-}
-
-bool setHostTimezone(const char *timezone) {
-#if defined(_WIN32)
-  const char *rule = strcmp(timezone, "UTC") == 0 ? "UTC0" : "GMT0BST,M3.5.0/1,M10.5.0/2";
-  if (_putenv_s("TZ", rule) != 0) return false;
-  _tzset();
-#else
-  if (setenv("TZ", timezone, 1) != 0) return false;
-  tzset();
-#endif
-  return true;
-}
-
-void runLifecycle(calendar::ConfigStore &store, calendar::HostDisplayTarget &display) {
-  calendar::CalendarSettings settings = calendar::defaultCalendarSettings();
-  if (!store.load(settings)) {
-    fprintf(stderr, "Settings file is invalid; using safe defaults for this refresh.\n");
-    settings = calendar::defaultCalendarSettings();
-    display.writeStatus(calendar::DisplayStatus::CalendarFeedFailed,
-                        "Settings invalid; edit and save in the local portal.");
-    return;
-  }
-  if (!setHostTimezone(settings.timezone)) {
-    fprintf(stderr, "Could not apply timezone %s; using Europe/London.\n", settings.timezone);
-    setHostTimezone(calendar::kDefaultCalendarTimezone);
-    settings = calendar::defaultCalendarSettings();
-  }
-  const calendar::CalendarDate today = localToday();
-  calendar::HostCalendarProvider provider(settings, today);
-  calendar::CalendarEvent events[calendar::kMaxEvents] = {};
-  const size_t count = provider.loadEvents(events, calendar::kMaxEvents);
-  if (provider.error()[0] != '\0') {
-    fprintf(stderr, "Calendar provider error: %s\n", provider.error());
-    display.writeStatus(calendar::DisplayStatus::CalendarFeedFailed, provider.error());
-    return;
-  }
-  printf("Refresh complete: %u events; next configured interval %lu seconds.\n",
-         static_cast<unsigned>(count), static_cast<unsigned long>(settings.refreshIntervalSeconds));
-  calendar::WeatherData weather = {};
-  std::ifstream fixture("test/fixtures/open_meteo.json");
-  const std::string json((std::istreambuf_iterator<char>(fixture)), std::istreambuf_iterator<char>());
-  if (calendar::parseWeatherResponse(json.c_str(), json.size(), weather, 0)) {
-    for (size_t i = 0; i < calendar::kWeatherForecastDays; ++i) {
-      const auto date = calendar::calendarDateAddDays(today, i);
-      snprintf(weather.forecast[i].date, sizeof(weather.forecast[i].date), "%04d-%02u-%02u", date.year, date.month, date.day);
+  calendar::CalendarDate localToday() {
+    calendar::CalendarDate today = {};
+    unsigned hour = 0;
+    unsigned minute = 0;
+    if (!calendar::localTimeFromEpoch(static_cast<int64_t>(time(nullptr)), today, hour, minute)) {
+      return {};
     }
-    printf("[weather] Offline demo fixture (not live weather).\n");
+    return today;
   }
-  calendar::FooterStatus footer;
-  footer.wifiLabel = "Home WiFi";
-  footer.wifiConnected = true;
-  footer.batteryPercent = 72; // Host demo only; firmware uses measured voltage.
-  char updated[6] = "--:--";
-  calendar::CalendarDate stampDate = {};
-  unsigned hour = 0, minute = 0;
-  if (calendar::localTimeFromEpoch(static_cast<int64_t>(time(nullptr)), stampDate, hour, minute))
-    snprintf(updated, sizeof(updated), "%02u:%02u", hour, minute);
-  footer.lastUpdated = updated;
-  if (!calendar::renderCalendar(display, events, count, today, "host-dev", "calendar-host", -1, weather, footer)) {
-    fprintf(stderr, "Could not write calendar preview.\n");
+
+  bool setHostTimezone(const char *timezone) {
+#if defined(_WIN32)
+    const char *rule = strcmp(timezone, "UTC") == 0 ? "UTC0" : "GMT0BST,M3.5.0/1,M10.5.0/2";
+    if (_putenv_s("TZ", rule) != 0) return false;
+    _tzset();
+#else
+    if (setenv("TZ", timezone, 1) != 0) return false;
+    tzset();
+#endif
+    return true;
   }
-}
+
+  void runLifecycle(calendar::ConfigStore &store, calendar::HostDisplayTarget &display) {
+    calendar::CalendarSettings settings = calendar::defaultCalendarSettings();
+    if (!store.load(settings)) {
+      fprintf(stderr, "Settings file is invalid; using safe defaults for this refresh.\n");
+      settings = calendar::defaultCalendarSettings();
+      display.writeStatus(calendar::DisplayStatus::CalendarFeedFailed,
+                          "Settings invalid; edit and save in the local portal.");
+      return;
+    }
+    if (!setHostTimezone(settings.timezone)) {
+      fprintf(stderr, "Could not apply timezone %s; using Europe/London.\n", settings.timezone);
+      setHostTimezone(calendar::kDefaultCalendarTimezone);
+      settings = calendar::defaultCalendarSettings();
+    }
+    const calendar::CalendarDate today = localToday();
+    calendar::HostCalendarProvider provider(settings, today);
+    calendar::CalendarEvent events[calendar::kMaxEvents] = {};
+    const size_t count = provider.loadEvents(events, calendar::kMaxEvents);
+    if (provider.error()[0] != '\0') {
+      fprintf(stderr, "Calendar provider error: %s\n", provider.error());
+      display.writeStatus(calendar::DisplayStatus::CalendarFeedFailed, provider.error());
+      return;
+    }
+    printf("Refresh complete: %u events; next configured interval %lu seconds.\n", static_cast<unsigned>(count),
+           static_cast<unsigned long>(settings.refreshIntervalSeconds));
+    calendar::WeatherData weather = {};
+    std::ifstream fixture("test/fixtures/open_meteo.json");
+    const std::string json((std::istreambuf_iterator<char>(fixture)), std::istreambuf_iterator<char>());
+    if (calendar::parseWeatherResponse(json.c_str(), json.size(), weather, 0)) {
+      for (size_t i = 0; i < calendar::kWeatherForecastDays; ++i) {
+        const auto date = calendar::calendarDateAddDays(today, i);
+        snprintf(weather.forecast[i].date, sizeof(weather.forecast[i].date), "%04d-%02u-%02u", date.year, date.month,
+                 date.day);
+      }
+      printf("[weather] Offline demo fixture (not live weather).\n");
+    }
+    calendar::FooterStatus footer;
+    footer.wifiLabel = "Home WiFi";
+    footer.wifiConnected = true;
+    footer.batteryPercent = 72; // Host demo only; firmware uses measured voltage.
+    char updated[6] = "--:--";
+    calendar::CalendarDate stampDate = {};
+    unsigned hour = 0, minute = 0;
+    if (calendar::localTimeFromEpoch(static_cast<int64_t>(time(nullptr)), stampDate, hour, minute))
+      snprintf(updated, sizeof(updated), "%02u:%02u", hour, minute);
+    footer.lastUpdated = updated;
+    if (!calendar::renderCalendar(display, events, count, today, "host-dev", "calendar-host", -1, weather, footer)) {
+      fprintf(stderr, "Could not write calendar preview.\n");
+    }
+  }
 
 } // namespace
 
