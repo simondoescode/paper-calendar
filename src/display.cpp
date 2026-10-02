@@ -811,10 +811,10 @@ void display_calendar_fill_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t
 #ifdef BB_EPAPER
     if (color <= BBEP_WHITE) {
         bbep.fillRect(x, y, width, height, color);
-    } else {
+    } else if (color == calendar::CalendarPatterns::kSidebarToken) {
         for (uint16_t py = y; py < y + height; py++) {
             for (uint16_t px = x; px < x + width; px++) {
-                if (((px + 2 * py) & 3) == 0) bbep.drawPixel(px, py, BBEP_BLACK);
+                if (calendar::CalendarPatterns::sidebarInk(px, py)) bbep.drawPixel(px, py, BBEP_BLACK);
             }
         }
     }

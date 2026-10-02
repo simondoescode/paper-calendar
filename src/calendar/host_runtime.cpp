@@ -449,7 +449,7 @@ namespace {
 void setHostPixel(std::vector<uint8_t> &pixels, int x, int y, DisplayColor color) {
   if (x < 0 || x >= kWidth || y < 0 || y >= kHeight) return;
   const bool black = color == DisplayColor::Black ||
-                     (color == DisplayColor::LightGrey && ((x + 2 * y) & 3) == 0);
+                     (color == CalendarPatterns::Sidebar && CalendarPatterns::sidebarInk(x, y));
   pixels[static_cast<size_t>(y) * kWidth + x] = black ? 0 : 1;
 }
 

@@ -5,10 +5,26 @@
 namespace calendar {
 
 enum class DisplayColor : uint8_t {
-  Black,
-  White,
-  LightGrey,
+  Black = 0,
+  White = 1,
+  // Pattern token, never a hardware grey level. Only fillRect and text
+  // backgrounds support it on the embedded adapter.
+  DitherLightGrey = 2,
 };
+
+// Canonical solid palette for the one-bit calendar display.
+namespace CalendarColors {
+constexpr DisplayColor Background = DisplayColor::White;
+constexpr DisplayColor Foreground = DisplayColor::Black;
+constexpr DisplayColor Border = DisplayColor::Black;
+}
+
+// Simulated tones are kept separate from physical colours.
+namespace CalendarPatterns {
+constexpr DisplayColor Sidebar = DisplayColor::DitherLightGrey;
+constexpr uint8_t kSidebarToken = static_cast<uint8_t>(Sidebar);
+constexpr bool sidebarInk(int x, int y) { return ((x + 2 * y) & 3) == 0; }
+}
 
 constexpr uint8_t kCalendarFontMain = 36;
 constexpr uint8_t kCalendarFontHeading = 18;

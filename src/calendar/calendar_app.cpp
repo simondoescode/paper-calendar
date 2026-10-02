@@ -81,11 +81,11 @@ public:
 private:
   static uint8_t color(calendar::DisplayColor value) {
     if (value == calendar::DisplayColor::White) return 1;
-    if (value == calendar::DisplayColor::LightGrey) return 2;
+    if (value == calendar::CalendarPatterns::Sidebar) return calendar::CalendarPatterns::kSidebarToken;
     return 0;
   }
   static uint8_t backgroundColor(calendar::DisplayColor value) {
-    return value == calendar::DisplayColor::LightGrey ? 255 : color(value);
+    return value == calendar::CalendarPatterns::Sidebar ? 255 : color(value);
   }
 };
 

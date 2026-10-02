@@ -98,11 +98,11 @@ void fitText(DisplayTarget &display, const char *source, char *output, size_t ou
 void drawCurrentWeather(DisplayTarget &display, const WeatherData &weather) {
   if (!weather.valid) {
     display.text(kCurrentWeatherX, baselineFromTop(display, 40, kCalendarFontFooter), "Weather unavailable",
-                 kCalendarFontFooter, DisplayColor::White, DisplayColor::Black);
+                 kCalendarFontFooter, CalendarColors::Background, CalendarColors::Foreground);
     return;
   }
   WeatherIcons::draw(display, getWeatherIcon(weather.current.condition, weather.current.isDay),
-                     kCurrentWeatherX + 6, 22, WeatherIcons::CURRENT_SIZE, DisplayColor::White);
+                     kCurrentWeatherX + 6, 22, WeatherIcons::CURRENT_SIZE, CalendarColors::Background);
   char temperature[12];
   char range[40];
   char fittedRange[40];
@@ -110,21 +110,21 @@ void drawCurrentWeather(DisplayTarget &display, const WeatherData &weather) {
   snprintf(range, sizeof(range), "H:%ld L:%ld Rain:%d%%", lroundf(weather.forecast[0].temperatureMaxC),
            lroundf(weather.forecast[0].temperatureMinC), weather.forecast[0].precipitationProbability);
   display.text(kCurrentWeatherX + 68, baselineFromTop(display, 32, kCalendarFontHeading), temperature, kCalendarFontHeading,
-               DisplayColor::White, DisplayColor::Black);
+               CalendarColors::Background, CalendarColors::Foreground);
   display.circle(static_cast<uint16_t>(kCurrentWeatherX + 73 + display.textWidth(temperature, kCalendarFontHeading)), 33, 3,
-                 DisplayColor::White, false);
+                 CalendarColors::Background, false);
   char label[24];
   fitText(display, conditionLabel(weather.current.condition), label, sizeof(label), kCalendarFontFooter, 138);
   display.text(kCurrentWeatherX, baselineFromTop(display, 75, kCalendarFontFooter), label, kCalendarFontFooter,
-               DisplayColor::White, DisplayColor::Black);
+               CalendarColors::Background, CalendarColors::Foreground);
   fitText(display, range, fittedRange, sizeof(fittedRange), kCalendarFontFooter, 138);
   display.text(kCurrentWeatherX, baselineFromTop(display, 94, kCalendarFontFooter), fittedRange, kCalendarFontFooter,
-               DisplayColor::White, DisplayColor::Black);
+               CalendarColors::Background, CalendarColors::Foreground);
 }
 
 void drawTodayCard(DisplayTarget &display, uint16_t y, const CalendarEvent &event, int64_t dayStart) {
   display.roundRect(kOuterPadding, y, kMainContentWidth, kTodayCardHeight, kCardRadius,
-                    DisplayColor::White, DisplayColor::Black);
+                    CalendarColors::Background, CalendarColors::Foreground);
   display.line(122, y + 12, 122, y + kTodayCardHeight - 12);
   char time[12];
   char title[kEventTitleLength];
@@ -146,7 +146,7 @@ size_t drawToday(DisplayTarget &display, const CalendarEvent *events, size_t cou
   const size_t todayCount = selectEventsForRange(events, count, range, today, kMaxEvents);
   if (todayCount == 0) {
     display.roundRect(kOuterPadding, 136, kMainContentWidth, 100, kCardRadius,
-                      DisplayColor::White, DisplayColor::Black);
+                      CalendarColors::Background, CalendarColors::Foreground);
     display.text(40, 194, "No events today", kCalendarFontTitle);
     return 0;
   }
@@ -172,14 +172,14 @@ void drawForecast(DisplayTarget &display, const WeatherData &weather) {
     snprintf(weekday, sizeof(weekday), "%s", kWeekdayNames[calendarWeekday(date)]);
     for (size_t letter = 1; letter < 3; ++letter) weekday[letter] += 'a' - 'A';
     display.text(centerX - display.textWidth(weekday, kCalendarFontFooter) / 2, baselineFromTop(display, 51, kCalendarFontFooter), weekday,
-                 kCalendarFontFooter, DisplayColor::Black, DisplayColor::LightGrey);
+                 kCalendarFontFooter, CalendarColors::Foreground, CalendarPatterns::Sidebar);
     WeatherIcons::draw(display, getWeatherIcon(weather.forecast[i].condition, true),
                        centerX - WeatherIcons::FORECAST_SIZE / 2, 72, WeatherIcons::FORECAST_SIZE);
   }
 }
 
 void drawUpcomingCard(DisplayTarget &display, uint16_t y, const CalendarEvent &event, CalendarDate eventDate) {
-  display.roundRect(kSidebarX, y, kSidebarContentWidth, kUpcomingCardHeight, kCardRadius, DisplayColor::White, DisplayColor::Black);
+  display.roundRect(kSidebarX, y, kSidebarContentWidth, kUpcomingCardHeight, kCardRadius, CalendarColors::Background, CalendarColors::Foreground);
   display.line(kUpcomingDividerX, y + 10, kUpcomingDividerX, y + kUpcomingCardHeight - 10);
   char title[kEventTitleLength];
   fitText(display, event.title, title, sizeof(title), kUpcomingTitleFont, kUpcomingTextWidth);
@@ -193,11 +193,11 @@ void drawUpcomingCard(DisplayTarget &display, uint16_t y, const CalendarEvent &e
 
 void drawLater(DisplayTarget &display, const CalendarEvent *events, size_t count, CalendarDate date,
                const WeatherData &weather) {
-  display.fillRect(kLeftColumnWidth, 0, kRightColumnWidth, kDisplayHeight, DisplayColor::LightGrey);
+  display.fillRect(kLeftColumnWidth, 0, kRightColumnWidth, kDisplayHeight, CalendarPatterns::Sidebar);
   const uint8_t headingFont = display.textWidth("Later this week", kCalendarFontHeading) <= kSidebarContentWidth
       ? kCalendarFontHeading : kCalendarFontTitle;
   display.text(kSidebarX, baselineFromTop(display, 17, headingFont), "Later this week", headingFont,
-               DisplayColor::Black, DisplayColor::LightGrey);
+               CalendarColors::Foreground, CalendarPatterns::Sidebar);
   drawForecast(display, weather);
 
   const CalendarRange laterRange = calendarRestOfWeekRange(date);
@@ -216,29 +216,29 @@ void drawLater(DisplayTarget &display, const CalendarEvent *events, size_t count
     y = static_cast<uint16_t>(y + kUpcomingCardHeight + kUpcomingCardGap);
   }
   if (laterCount == 0) display.text(kSidebarX + 16, 155, "No upcoming events", kCalendarFontFooter,
-                                    DisplayColor::Black, DisplayColor::LightGrey);
+                                    CalendarColors::Foreground, CalendarPatterns::Sidebar);
 }
 
 void drawWifiIcon(DisplayTarget &display, uint16_t x, uint16_t y, bool connected) {
   display.bitmap(x, y, connected ? StatusIcons::k_wifi : StatusIcons::k_wifi_off,
-                 kFooterIconSize, kFooterIconSize, DisplayColor::Black);
+                 kFooterIconSize, kFooterIconSize, CalendarColors::Foreground);
 }
 
 void drawCalendarIcon(DisplayTarget &display, uint16_t x, uint16_t y) {
-  display.bitmap(x, y, StatusIcons::k_calendar, kFooterIconSize, kFooterIconSize, DisplayColor::Black);
+  display.bitmap(x, y, StatusIcons::k_calendar, kFooterIconSize, kFooterIconSize, CalendarColors::Foreground);
 }
 
 void drawBatteryIcon(DisplayTarget &display, uint16_t x, uint16_t y, const FooterStatus &status) {
-  display.bitmap(x, y, StatusIcons::k_battery, kFooterIconSize, kFooterIconSize, DisplayColor::Black);
+  display.bitmap(x, y, StatusIcons::k_battery, kFooterIconSize, kFooterIconSize, CalendarColors::Foreground);
   if (status.batteryPercent >= 0) {
     const int percent = status.batteryPercent > 100 ? 100 : status.batteryPercent;
     const uint16_t fill = static_cast<uint16_t>(percent * 8 / 100);
-    if (fill) display.fillRect(x + 3, y + 6, fill, 4, DisplayColor::Black);
+    if (fill) display.fillRect(x + 3, y + 6, fill, 4, CalendarColors::Foreground);
   }
 }
 
 void drawFooter(DisplayTarget &display, const FooterStatus &status) {
-  display.fillRect(0, kFooterTop, kDisplayWidth, kFooterHeight, DisplayColor::White);
+  display.fillRect(0, kFooterTop, kDisplayWidth, kFooterHeight, CalendarColors::Background);
   display.line(0, kFooterTop, kDisplayWidth - 1, kFooterTop);
   const uint16_t centerY = kFooterTop + kFooterHeight / 2;
   const uint16_t baseline = centerY + display.fontHeight(kFooterFont) / 2;
@@ -270,7 +270,7 @@ void drawFooter(DisplayTarget &display, const FooterStatus &status) {
   x += kFooterIconSize + kFooterIconGap;
   display.text(x, baseline, eventLabel, kFooterFont);
   x += eventWidth + kFooterSeparatorGap;
-  display.circle(x, centerY, 1, DisplayColor::Black, true);
+  display.circle(x, centerY, 1, CalendarColors::Foreground, true);
   display.text(x + kFooterSeparatorGap, baseline, updateLabel, kFooterFont);
 
   x = rightX;
@@ -278,7 +278,7 @@ void drawFooter(DisplayTarget &display, const FooterStatus &status) {
   x += kFooterIconSize + kFooterIconGap;
   display.text(x, baseline, networkLabel, kFooterFont);
   x += networkWidth + kFooterSeparatorGap;
-  display.circle(x, centerY, 1, DisplayColor::Black, true);
+  display.circle(x, centerY, 1, CalendarColors::Foreground, true);
   x += kFooterSeparatorGap;
   drawBatteryIcon(display, x, iconY, status);
   display.text(x + kFooterIconSize + kFooterIconGap, baseline, batteryLabel, kFooterFont);
@@ -335,11 +335,11 @@ bool renderCalendar(DisplayTarget &display, const CalendarEvent *events, size_t 
   (void)deviceModel;
   (void)batteryTenthsVolts;
   if (!display.begin()) return false;
-  display.fillRect(0, 0, kLeftColumnWidth, kHeaderHeight, DisplayColor::Black);
+  display.fillRect(0, 0, kLeftColumnWidth, kHeaderHeight, CalendarColors::Foreground);
   char dateLabel[36];
   formatDate(date, dateLabel, sizeof(dateLabel));
   display.text(20, baselineFromTop(display, 18, kCalendarFontMetadata), dateLabel, kCalendarFontMetadata,
-               DisplayColor::White, DisplayColor::Black);
+               CalendarColors::Background, CalendarColors::Foreground);
   const char *weekday = kFullWeekdayNames[calendarWeekday(date)];
   char shortWeekday[4];
   if (display.textWidth(weekday, kCalendarFontMain) > kCurrentWeatherX - 20 - kOuterPadding) {
@@ -347,7 +347,7 @@ bool renderCalendar(DisplayTarget &display, const CalendarEvent *events, size_t 
     weekday = shortWeekday;
   }
   display.text(20, baselineFromTop(display, 46, kCalendarFontMain), weekday, kCalendarFontMain,
-               DisplayColor::White, DisplayColor::Black);
+               CalendarColors::Background, CalendarColors::Foreground);
   drawCurrentWeather(display, weather);
   const size_t todayCount = drawToday(display, events, eventCount, date);
   drawLater(display, events, eventCount, date, weather);
