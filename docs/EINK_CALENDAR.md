@@ -72,29 +72,44 @@ keep a second full-screen bitmap in RAM.
 ## Calendar footer
 
 The calendar has a 32 px white status bar across the bottom of the 800x480
-canvas, with a one-pixel black separator at y=448. The 560/240 main/sidebar
-split, card dimensions and weather structure remain intact. Main-card gaps
+canvas, with a one-pixel black separator at y=448. The columns use a rounded 60/40 split after accounting for 16 px
+outer margins and a 32 px padded gutter: 768 px inside the margins,
+736 px available to the columns, 442 px main content and 294 px sidebar
+content. Full-bleed backgrounds meet at x=474; sidebar content starts
+at x=490. Sidebar cards use a 44 px block containing only a centered weekday,
+with 12 px between the divider and event text and 12 px right padding, giving
+event titles 226 px. Cards are 52 px tall and show only the weekday and a
+vertically centered title in the existing 13 px Manrope Medium font, with
+ellipsis truncation when needed. The sidebar heading has no date
+range; the forecast shows only weekday names and icons, starting at
+y=51, without dates or temperatures. The first sidebar card starts at y=124. Forecast cells
+share the sidebar width evenly. Main-card gaps
 are 10 px and sidebar-card gaps are 8 px, leaving all cards above the footer.
-Overflow indicators move into the small spaces above the cards.
+Events beyond the visible cards do not display overflow labels.
 
 `FooterStatus` in `include/calendar/footer_status.h` passes values from the
 lifecycle adapter to the shared renderer. Footer drawing uses the existing
 compressed bitmap font renderer with compact Manrope Medium (`Manrope_Medium_8.h`).
-Wi-Fi, calendar and battery icons are line/rectangle/circle
-primitives; separator dots are filled circles. There is no new graphics
+Wi-Fi, calendar and battery icons are vendored Lucide SVGs rasterized into
+16px monochrome sprites (128 bytes total) by `tools/generate_status_icons.py`,
+using the weather icon generator dependencies. Disconnected Wi-Fi uses
+Lucide `wifi-off`; battery percentage fills the Lucide battery outline.
+License notices are in `assets/status/lucide/LICENSE`. Separator dots are
+filled circles. There is no new graphics
 library, framebuffer, network operation or heap allocation in footer drawing.
 
-The left group shows a generic **Home WiFi** label and the actual connection
-state, followed by local `Last updated: HH:MM`. The label is intentionally a
-placeholder rather than the saved SSID. The timestamp is prepared after
+The left group reports all current-day events in the bounded provider data,
+including events beyond the four visible cards, followed by local
+`Last updated: HH:MM`. The timestamp is prepared after
 calendar/weather retrieval, immediately before deciding whether to draw.
 It is part of the visible-state hash, so a changed displayed minute triggers
 a redraw even if events are unchanged. One render still performs one panel
 refresh. The same minute and otherwise unchanged visible state can still skip
 refreshing.
 
-The right group reports all current-day events in the bounded provider data,
-including events beyond the four visible cards. A supplied percentage is
+The right group shows a generic **Home WiFi** label and the actual connection
+state, followed by the battery reading. The label is intentionally a
+placeholder rather than the saved SSID. A supplied percentage is
 clamped to 0–100. Firmware uses the existing measured battery voltage because
 the ADC abstraction does not expose calibrated charge percentage; unknown
 battery/time values show `--%` / `--:--`. The host preview uses a clearly

@@ -555,10 +555,10 @@ void test_host_fixture_provider_renders_shared_800_by_480_png(void) {
   };
   BoundsCheckedDisplay display(path);
   TEST_ASSERT_TRUE(calendar::renderCalendar(display, events, count, today, "test", "calendar-host", -1, parsedWeatherFixture()));
-  TEST_ASSERT_EQUAL_UINT(4, display.bitmapCount);
+  TEST_ASSERT_EQUAL_UINT(7, display.bitmapCount);
   TEST_ASSERT_EQUAL_UINT(1, display.refreshCount);
   TEST_ASSERT_TRUE(calendar::renderCalendar(display, events, count, today, "test", "calendar-host", -1, calendar::WeatherData{}));
-  TEST_ASSERT_EQUAL_UINT(4, display.bitmapCount);
+  TEST_ASSERT_EQUAL_UINT(10, display.bitmapCount);
   TEST_ASSERT_EQUAL_UINT(2, display.refreshCount);
   std::ifstream file(path, std::ios::binary);
   unsigned char header[25] = {};
@@ -677,9 +677,9 @@ void test_footer_fits_long_labels_and_keeps_cards_above_status_bar() {
   TEST_ASSERT_EQUAL_UINT(1, display.refreshes);
   TEST_ASSERT_EQUAL_UINT(4, display.labels.size());
   TEST_ASSERT_EQUAL_STRING("6 events today", display.labels[0].c_str());
-  TEST_ASSERT_EQUAL_STRING("72%", display.labels[1].c_str());
+  TEST_ASSERT_EQUAL_STRING("72%", display.labels[3].c_str());
   TEST_ASSERT_NOT_NULL(strstr(display.labels[2].c_str(), "..."));
-  TEST_ASSERT_EQUAL_STRING("Last updated: 18:42", display.labels[3].c_str());
+  TEST_ASSERT_EQUAL_STRING("Last updated: 18:42", display.labels[1].c_str());
   display.labels.clear();
   footer.wifiLabel = nullptr;
   footer.lastUpdated = nullptr;
@@ -687,14 +687,14 @@ void test_footer_fits_long_labels_and_keeps_cards_above_status_bar() {
   footer.batteryTenthsVolts = 39;
   TEST_ASSERT_TRUE(calendar::renderCalendar(display, nullptr, 0, today, "test", "host", 39, calendar::WeatherData{}, footer));
   TEST_ASSERT_EQUAL_STRING("0 events today", display.labels[0].c_str());
-  TEST_ASSERT_EQUAL_STRING("3.9V", display.labels[1].c_str());
-  TEST_ASSERT_EQUAL_STRING("Last updated: --:--", display.labels[3].c_str());
+  TEST_ASSERT_EQUAL_STRING("3.9V", display.labels[3].c_str());
+  TEST_ASSERT_EQUAL_STRING("Last updated: --:--", display.labels[1].c_str());
   display.labels.clear();
   footer.todayEventCount = 1;
   footer.batteryPercent = 200;
   TEST_ASSERT_TRUE(calendar::renderCalendar(display, nullptr, 0, today, "test", "host", -1, calendar::WeatherData{}, footer));
   TEST_ASSERT_EQUAL_STRING("1 event today", display.labels[0].c_str());
-  TEST_ASSERT_EQUAL_STRING("100%", display.labels[1].c_str());
+  TEST_ASSERT_EQUAL_STRING("100%", display.labels[3].c_str());
   remove("footer-preview-test.png");
 }
 
