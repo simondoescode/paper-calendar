@@ -1,7 +1,7 @@
-#include <calendar/settings.h>
 #include <calendar/calendar_config.h>
-#include <math.h>
+#include <calendar/settings.h>
 #include <initializer_list>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -121,9 +121,8 @@ namespace calendar {
   }
 
   bool validateCalendarSettings(const CalendarSettings &settings, char *error, size_t errorSize) {
-    if (!isfinite(settings.weatherLatitude) || !isfinite(settings.weatherLongitude) ||
-        settings.weatherLatitude < -90 || settings.weatherLatitude > 90 ||
-        settings.weatherLongitude < -180 || settings.weatherLongitude > 180) {
+    if (!isfinite(settings.weatherLatitude) || !isfinite(settings.weatherLongitude) || settings.weatherLatitude < -90 ||
+        settings.weatherLatitude > 90 || settings.weatherLongitude < -180 || settings.weatherLongitude > 180) {
       setError(error, errorSize, "Weather latitude must be between -90 and 90; longitude between -180 and 180.");
       return false;
     }
@@ -184,8 +183,10 @@ namespace calendar {
         setError(error, errorSize, "Weather coordinates must be decimal numbers.");
         return false;
       }
-      if (strcmp(name, "weather_latitude") == 0) submitted.weatherLatitude = coordinate;
-      else submitted.weatherLongitude = coordinate;
+      if (strcmp(name, "weather_latitude") == 0)
+        submitted.weatherLatitude = coordinate;
+      else
+        submitted.weatherLongitude = coordinate;
     }
     if (!validateCalendarSettings(submitted, error, errorSize)) {
       return false;
