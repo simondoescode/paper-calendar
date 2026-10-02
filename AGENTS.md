@@ -30,8 +30,17 @@ hardware, persistence, networking, and host-emulator adapters.
 
 ## Build and test
 
-Run commands from the repository root. Before committing any changed C/C++
-source or header files, run the shared formatter:
+Run commands from the repository root. Repository-managed Git hooks should be
+installed once per clone:
+
+```sh
+python scripts/install_git_hooks.py
+```
+
+The pre-commit hook automatically formats staged C/C++ source/header files,
+re-stages the formatter output, and verifies it before allowing the commit.
+
+For manual formatting or verification, use:
 
 ```sh
 python scripts/format_changed.py
