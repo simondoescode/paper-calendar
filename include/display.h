@@ -126,7 +126,7 @@ uint16_t display_width();
  */
 bool display_calendar_begin();
 void display_calendar_text(uint16_t x, uint16_t y, const char *text, uint8_t font_size, uint8_t foreground = 0,
-                           uint8_t background = 1);
+                           uint8_t background = 3);
 uint16_t display_calendar_text_width(const char *text, uint8_t font_size);
 uint8_t display_calendar_font_height(uint8_t font_size);
 calendar::TextVerticalBounds display_calendar_text_vertical_bounds(const char *text, uint8_t font_size);
