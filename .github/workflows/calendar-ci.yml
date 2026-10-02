@@ -27,6 +27,9 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Install system build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
+
       - name: Install build tools
         run: pip install --upgrade platformio==6.1.19 clang-format==22.1.0
 
