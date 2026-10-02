@@ -6,25 +6,21 @@ namespace calendar {
 
   enum class DisplayColor : uint8_t {
     Black = 0,
-    White = 1,
-  // Pattern token, never a hardware grey level. Only rectangle fills and text
-  // backgrounds support it on the embedded adapter.
-    DitherLightGrey = 2,
+    DarkGrey = 1,
+    LightGrey = 2,
+    White = 3,
   };
 
-// Canonical solid palette for the one-bit calendar display.
+// The calendar uses the four logical grayscale samples supported by bb_epaper's
+// 7.5-inch 4-gray profiles. The embedded adapter passes these values directly
+// to the driver, which maps them to the calibrated two-plane panel encoding.
   namespace CalendarColors {
     constexpr DisplayColor Background = DisplayColor::White;
     constexpr DisplayColor Foreground = DisplayColor::Black;
     constexpr DisplayColor Border = DisplayColor::Black;
+    constexpr DisplayColor Muted = DisplayColor::DarkGrey;
+    constexpr DisplayColor Sidebar = DisplayColor::LightGrey;
   } // namespace CalendarColors
-
-// Simulated tones are kept separate from physical colours.
-  namespace CalendarPatterns {
-    constexpr DisplayColor Sidebar = DisplayColor::DitherLightGrey;
-    constexpr uint8_t kSidebarToken = static_cast<uint8_t>(Sidebar);
-    constexpr bool sidebarInk(int x, int y) { return ((x + 2 * y) & 3) == 0; }
-  } // namespace CalendarPatterns
 
   constexpr uint8_t kCalendarFontMain = 36;
   constexpr uint8_t kCalendarFontHeading = 18;
