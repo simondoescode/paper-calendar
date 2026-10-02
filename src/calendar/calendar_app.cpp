@@ -9,12 +9,14 @@
 #include <calendar/calendar_renderer.h>
 #include <calendar/clock_service.h>
 #include <calendar/icalendar_feed_provider.h>
+#include <calendar/ota.h>
 #include <calendar/settings.h>
 #include <calendar/wake_reason.h>
 #include <calendar/wifi_manager.h>
 #include <calendar/weather_client.h>
 #include <config.h>
 #include <display.h>
+#include <esp_ota_ops.h>
 #include <esp_sleep.h>
 #include <globals.h>
 #include <misc/buzzer.h>
@@ -263,6 +265,12 @@ void calendar_app_setup() {
   display_init();
   pins_init();
   buzzer().init();
+  const esp_err_t otaValidation = esp_ota_mark_app_valid_cancel_rollback();
+  if (otaValidation == ESP_OK) {
+    Serial.println("[ota] Running firmware marked valid after hardware startup");
+  } else {
+    Serial.printf("[ota] Firmware validation returned %d\n", static_cast<int>(otaValidation));
+  }
   if (wakeReason == calendar::WakeReason::Key3) {
     const ButtonPressResult buttonResult = read_button_presses();
     if (buttonResult == LongPress || buttonResult == SoftReset) {
@@ -341,6 +349,17 @@ void calendar_app_setup() {
     return;
   }
   Serial.printf("London local time: %04d-%02u-%02u %02u:%02u\n", today.year, today.month, today.day, hour, minute);
+
+  const uint32_t otaNow = nowEpoch > 0 ? static_cast<uint32_t>(nowEpoch) : 0;
+  const bool forceOtaCheck = wakeReason == calendar::WakeReason::Key3;
+  const calendar::OtaCheckResult otaResult = calendar::checkForFirmwareUpdate(forceOtaCheck, otaNow);
+  if (otaResult == calendar::OtaCheckResult::UpdateInstalled) {
+    Serial.println("[ota] Rebooting into newly installed firmware");
+    Serial.flush();
+    delay(100);
+    ESP.restart();
+    return;
+  }
 
   char calendarFeedUrl[512] = {};
   bool haveCalendarFeed = false;
