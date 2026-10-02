@@ -10,7 +10,6 @@
 
 void setup() {
   Serial.begin(115200);
-  esp_ota_mark_app_valid_cancel_rollback();
   calendar_app_setup();
 }
 
