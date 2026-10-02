@@ -4,13 +4,13 @@
 
 namespace calendar {
 
-enum class OtaCheckResult : uint8_t {
-  Skipped,
-  UpToDate,
-  UpdateInstalled,
-  Failed,
-};
+  enum class OtaCheckResult : uint8_t {
+    Skipped,
+    UpToDate,
+    UpdateInstalled,
+    Failed,
+  };
 
-OtaCheckResult checkForFirmwareUpdate(bool force, uint32_t nowEpoch);
+  OtaCheckResult checkForFirmwareUpdate(bool force, uint32_t nowEpoch);
 
 } // namespace calendar

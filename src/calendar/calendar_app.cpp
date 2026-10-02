@@ -4,226 +4,217 @@
 #include <Preferences.h>
 #include <button.h>
 #include <calendar/calendar.h>
-#include <calendar/calendar_config.h>
 #include <calendar/calendar_app.h>
+#include <calendar/calendar_config.h>
 #include <calendar/calendar_renderer.h>
 #include <calendar/clock_service.h>
 #include <calendar/icalendar_feed_provider.h>
 #include <calendar/ota.h>
 #include <calendar/settings.h>
 #include <calendar/wake_reason.h>
-#include <calendar/wifi_manager.h>
 #include <calendar/weather_client.h>
+#include <calendar/wifi_manager.h>
 #include <config.h>
 #include <display.h>
 #include <esp_ota_ops.h>
 #include <esp_sleep.h>
 #include <globals.h>
+#include <math.h>
+#include <memory>
 #include <misc/buzzer.h>
 #include <pins.h>
-
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <memory>
 #include <time.h>
 
 extern TRMNL_DEVICE *pDevice;
 
 namespace {
 
-const char *const kWeekdayNames[] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
-const char *const kMonthNames[] = {"JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-                                   "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
-const char *const kFullWeekdayNames[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
-                                         "Saturday"};
-const char *const kFullMonthNames[] = {"January", "February", "March", "April", "May", "June",
-                                       "July", "August", "September", "October", "November", "December"};
-RTC_DATA_ATTR uint32_t gLastDisplayHash = 0;
-RTC_DATA_ATTR uint32_t gLastDisplayMarker = 0;
-RTC_NOINIT_ATTR volatile uint32_t gPendingManualRefreshMarker;
-constexpr uint32_t kDisplayHashMarker = 0x43414C31;
-constexpr uint32_t kPendingManualRefreshValue = 0x4B455933;
-uint32_t gRefreshIntervalSeconds = calendar::AUTO_REFRESH_INTERVAL_SECONDS;
+  const char *const kWeekdayNames[] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
+  const char *const kMonthNames[] = {"JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+                                     "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
+  const char *const kFullWeekdayNames[] = {"Sunday",   "Monday", "Tuesday", "Wednesday",
+                                           "Thursday", "Friday", "Saturday"};
+  const char *const kFullMonthNames[] = {"January", "February", "March",     "April",   "May",      "June",
+                                         "July",    "August",   "September", "October", "November", "December"};
+  RTC_DATA_ATTR uint32_t gLastDisplayHash = 0;
+  RTC_DATA_ATTR uint32_t gLastDisplayMarker = 0;
+  RTC_NOINIT_ATTR volatile uint32_t gPendingManualRefreshMarker;
+  constexpr uint32_t kDisplayHashMarker = 0x43414C31;
+  constexpr uint32_t kPendingManualRefreshValue = 0x4B455933;
+  uint32_t gRefreshIntervalSeconds = calendar::AUTO_REFRESH_INTERVAL_SECONDS;
 
-void IRAM_ATTR onKey3Pressed() { gPendingManualRefreshMarker = kPendingManualRefreshValue; }
+  void IRAM_ATTR onKey3Pressed() { gPendingManualRefreshMarker = kPendingManualRefreshValue; }
 
-class EpaperDisplayTarget : public calendar::DisplayTarget {
-public:
-  bool begin() override { return display_calendar_begin(); }
-  void text(uint16_t x, uint16_t y, const char *value, uint8_t size, calendar::DisplayColor foreground,
-            calendar::DisplayColor background) override {
-    display_calendar_text(x, y, value, size, color(foreground), backgroundColor(background));
-  }
-  uint16_t textWidth(const char *value, uint8_t size) override {
-    return display_calendar_text_width(value, size);
-  }
-  uint8_t fontHeight(uint8_t size) override { return display_calendar_font_height(size); }
-  calendar::TextVerticalBounds textVerticalBounds(const char *value, uint8_t size) override {
-    return display_calendar_text_vertical_bounds(value, size);
-  }
-  void line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, calendar::DisplayColor lineColor) override {
-    display_calendar_line(x1, y1, x2, y2, color(lineColor));
-  }
-  void fillRect(uint16_t x, uint16_t y, uint16_t width, uint16_t height,
-                calendar::DisplayColor fill) override {
-    display_calendar_fill_rect(x, y, width, height, color(fill));
-  }
-  void roundRect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint8_t radius,
-                 calendar::DisplayColor fill, calendar::DisplayColor border) override {
-    display_calendar_round_rect(x, y, width, height, radius, color(fill), color(border));
-  }
-  void circle(uint16_t x, uint16_t y, uint16_t radius, calendar::DisplayColor circleColor,
-              bool filled) override {
-    display_calendar_circle(x, y, radius, color(circleColor), filled);
-  }
-  bool refresh() override { return display_calendar_refresh(); }
-  void bitmap(uint16_t x, uint16_t y, const uint8_t *data, uint16_t width, uint16_t height,
-              calendar::DisplayColor foreground) override {
-    display_calendar_bitmap(x, y, data, width, height, color(foreground));
+  class EpaperDisplayTarget : public calendar::DisplayTarget {
+  public:
+    bool begin() override { return display_calendar_begin(); }
+    void text(uint16_t x, uint16_t y, const char *value, uint8_t size, calendar::DisplayColor foreground,
+              calendar::DisplayColor background) override {
+      display_calendar_text(x, y, value, size, color(foreground), backgroundColor(background));
+    }
+    uint16_t textWidth(const char *value, uint8_t size) override { return display_calendar_text_width(value, size); }
+    uint8_t fontHeight(uint8_t size) override { return display_calendar_font_height(size); }
+    calendar::TextVerticalBounds textVerticalBounds(const char *value, uint8_t size) override {
+      return display_calendar_text_vertical_bounds(value, size);
+    }
+    void line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, calendar::DisplayColor lineColor) override {
+      display_calendar_line(x1, y1, x2, y2, color(lineColor));
+    }
+    void fillRect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, calendar::DisplayColor fill) override {
+      display_calendar_fill_rect(x, y, width, height, color(fill));
+    }
+    void roundRect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint8_t radius, calendar::DisplayColor fill,
+                   calendar::DisplayColor border) override {
+      display_calendar_round_rect(x, y, width, height, radius, color(fill), color(border));
+    }
+    void circle(uint16_t x, uint16_t y, uint16_t radius, calendar::DisplayColor circleColor, bool filled) override {
+      display_calendar_circle(x, y, radius, color(circleColor), filled);
+    }
+    bool refresh() override { return display_calendar_refresh(); }
+    void bitmap(uint16_t x, uint16_t y, const uint8_t *data, uint16_t width, uint16_t height,
+                calendar::DisplayColor foreground) override {
+      display_calendar_bitmap(x, y, data, width, height, color(foreground));
+    }
+
+  private:
+    static uint8_t color(calendar::DisplayColor value) {
+      if (value == calendar::DisplayColor::White) return 1;
+      if (value == calendar::CalendarPatterns::Sidebar) return calendar::CalendarPatterns::kSidebarToken;
+      return 0;
+    }
+    static uint8_t backgroundColor(calendar::DisplayColor value) {
+      return value == calendar::CalendarPatterns::Sidebar ? 255 : color(value);
+    }
+  };
+
+  bool drawCalendar(const calendar::CalendarEvent *events, size_t count, calendar::CalendarDate date,
+                    int16_t batteryTenthsVolts, const calendar::WeatherData &weather,
+                    const calendar::FooterStatus &footer) {
+    char firmwareVersion[48];
+    if (FW_COMMIT[0] != '\0') {
+      snprintf(firmwareVersion, sizeof(firmwareVersion), "%s-%s", FW_VERSION_STRING, FW_COMMIT);
+    } else {
+      snprintf(firmwareVersion, sizeof(firmwareVersion), "%s", FW_VERSION_STRING);
+    }
+    EpaperDisplayTarget display;
+    return calendar::renderCalendar(display, events, count, date, firmwareVersion, DEVICE_MODEL, batteryTenthsVolts,
+                                    weather, footer);
   }
 
-private:
-  static uint8_t color(calendar::DisplayColor value) {
-    if (value == calendar::DisplayColor::White) return 1;
-    if (value == calendar::CalendarPatterns::Sidebar) return calendar::CalendarPatterns::kSidebarToken;
-    return 0;
+  const char *statusText(calendar::DisplayStatus status) {
+    switch (status) {
+    case calendar::DisplayStatus::WifiSetupRequired:
+      return "Wi-Fi setup required";
+    case calendar::DisplayStatus::WifiConnectionFailed:
+      return "Unable to connect to Wi-Fi";
+    case calendar::DisplayStatus::TimeSyncFailed:
+      return "Unable to synchronize time";
+    case calendar::DisplayStatus::CalendarFeedSetupRequired:
+      return "Calendar feed setup required";
+    case calendar::DisplayStatus::CalendarFeedFailed:
+      return "Unable to load calendar feed";
+    case calendar::DisplayStatus::Calendar:
+      return "E-Ink Calendar";
+    }
+    return "Calendar error";
   }
-  static uint8_t backgroundColor(calendar::DisplayColor value) {
-    return value == calendar::CalendarPatterns::Sidebar ? 255 : color(value);
-  }
-};
 
-bool drawCalendar(const calendar::CalendarEvent *events, size_t count, calendar::CalendarDate date,
-                  int16_t batteryTenthsVolts, const calendar::WeatherData &weather,
-                  const calendar::FooterStatus &footer) {
-  char firmwareVersion[48];
-  if (FW_COMMIT[0] != '\0') {
-    snprintf(firmwareVersion, sizeof(firmwareVersion), "%s-%s", FW_VERSION_STRING, FW_COMMIT);
-  } else {
-    snprintf(firmwareVersion, sizeof(firmwareVersion), "%s", FW_VERSION_STRING);
+  void drawStatus(calendar::DisplayStatus status, const char *provisioningSsid, const char *detail) {
+    display_calendar_text(32, 24, "E-Ink Calendar", 24);
+    display_calendar_line(32, 76, 768, 76);
+    display_calendar_text(32, 124, statusText(status), 24);
+    if (status == calendar::DisplayStatus::WifiSetupRequired) {
+      char instruction[80];
+      snprintf(instruction, sizeof(instruction), "Connect to setup Wi-Fi: %.42s", provisioningSsid);
+      display_calendar_text(32, 175, instruction, 18);
+      display_calendar_text(32, 207, "Then follow the captive portal instructions.", 18);
+    } else if (status == calendar::DisplayStatus::WifiConnectionFailed) {
+      display_calendar_text(32, 175, "Check the network, or join the device setup Wi-Fi", 18);
+      char instruction[80];
+      snprintf(instruction, sizeof(instruction), "Setup Wi-Fi: %.55s", provisioningSsid);
+      display_calendar_text(32, 207, instruction, 18);
+    } else if (status == calendar::DisplayStatus::TimeSyncFailed) {
+      display_calendar_text(32, 175, "Wi-Fi is connected, but NTP time was not available.", 18);
+      display_calendar_text(32, 207, "The calendar date is not being shown as valid.", 18);
+    } else if (status == calendar::DisplayStatus::CalendarFeedSetupRequired) {
+      display_calendar_text(32, 175, "Open the setup Wi-Fi portal and paste your private .ics URL.", 18);
+      display_calendar_text(32, 207, "Keep this URL private; it grants calendar read access.", 18);
+    } else if (status == calendar::DisplayStatus::CalendarFeedFailed) {
+      display_calendar_text(32, 175, detail == nullptr ? "Check the private .ics URL and feed contents." : detail, 18);
+      display_calendar_text(32, 207, "No events were shown; the device will retry after sleep.", 18);
+    }
+    display_calendar_text(32, 455, "The device will retry automatically after sleep.", 8);
   }
-  EpaperDisplayTarget display;
-  return calendar::renderCalendar(display, events, count, date, firmwareVersion, DEVICE_MODEL,
-                                  batteryTenthsVolts, weather, footer);
-}
 
-const char *statusText(calendar::DisplayStatus status) {
-  switch (status) {
-  case calendar::DisplayStatus::WifiSetupRequired:
-    return "Wi-Fi setup required";
-  case calendar::DisplayStatus::WifiConnectionFailed:
-    return "Unable to connect to Wi-Fi";
-  case calendar::DisplayStatus::TimeSyncFailed:
-    return "Unable to synchronize time";
-  case calendar::DisplayStatus::CalendarFeedSetupRequired:
-    return "Calendar feed setup required";
-  case calendar::DisplayStatus::CalendarFeedFailed:
-    return "Unable to load calendar feed";
-  case calendar::DisplayStatus::Calendar:
-    return "E-Ink Calendar";
-  }
-  return "Calendar error";
-}
+  bool renderIfChanged(calendar::DisplayStatus status, calendar::CalendarDate date,
+                       const calendar::CalendarEvent *events, size_t eventCount, int16_t batteryTenthsVolts,
+                       const char *provisioningSsid = "", const char *detail = "",
+                       const calendar::WeatherData *weather = nullptr, const calendar::FooterStatus *footer = nullptr) {
+    uint32_t stateHash = calendar::displayStateHash(status, date, events, eventCount, batteryTenthsVolts);
+    if (status == calendar::DisplayStatus::Calendar && weather)
+      stateHash = (stateHash ^ calendar::weatherDisplayHash(*weather)) * 16777619UL;
+    if (status == calendar::DisplayStatus::Calendar && footer)
+      stateHash = (stateHash ^ calendar::footerDisplayHash(*footer)) * 16777619UL;
+    if (gLastDisplayMarker == kDisplayHashMarker && gLastDisplayHash == stateHash) {
+      Serial.println("Calendar render skipped: visible content unchanged");
+      return true;
+    }
 
-void drawStatus(calendar::DisplayStatus status, const char *provisioningSsid, const char *detail) {
-  display_calendar_text(32, 24, "E-Ink Calendar", 24);
-  display_calendar_line(32, 76, 768, 76);
-  display_calendar_text(32, 124, statusText(status), 24);
-  if (status == calendar::DisplayStatus::WifiSetupRequired) {
-    char instruction[80];
-    snprintf(instruction, sizeof(instruction), "Connect to setup Wi-Fi: %.42s", provisioningSsid);
-    display_calendar_text(32, 175, instruction, 18);
-    display_calendar_text(32, 207, "Then follow the captive portal instructions.", 18);
-  } else if (status == calendar::DisplayStatus::WifiConnectionFailed) {
-    display_calendar_text(32, 175, "Check the network, or join the device setup Wi-Fi", 18);
-    char instruction[80];
-    snprintf(instruction, sizeof(instruction), "Setup Wi-Fi: %.55s", provisioningSsid);
-    display_calendar_text(32, 207, instruction, 18);
-  } else if (status == calendar::DisplayStatus::TimeSyncFailed) {
-    display_calendar_text(32, 175, "Wi-Fi is connected, but NTP time was not available.", 18);
-    display_calendar_text(32, 207, "The calendar date is not being shown as valid.", 18);
-  } else if (status == calendar::DisplayStatus::CalendarFeedSetupRequired) {
-    display_calendar_text(32, 175, "Open the setup Wi-Fi portal and paste your private .ics URL.", 18);
-    display_calendar_text(32, 207, "Keep this URL private; it grants calendar read access.", 18);
-  } else if (status == calendar::DisplayStatus::CalendarFeedFailed) {
-    display_calendar_text(32, 175, detail == nullptr ? "Check the private .ics URL and feed contents." : detail, 18);
-    display_calendar_text(32, 207, "No events were shown; the device will retry after sleep.", 18);
-  }
-  display_calendar_text(32, 455, "The device will retry automatically after sleep.", 8);
-}
-
-bool renderIfChanged(calendar::DisplayStatus status, calendar::CalendarDate date,
-                     const calendar::CalendarEvent *events, size_t eventCount, int16_t batteryTenthsVolts,
-                     const char *provisioningSsid = "", const char *detail = "",
-                     const calendar::WeatherData *weather = nullptr,
-                     const calendar::FooterStatus *footer = nullptr) {
-  uint32_t stateHash =
-    calendar::displayStateHash(status, date, events, eventCount, batteryTenthsVolts);
-  if (status == calendar::DisplayStatus::Calendar && weather)
-    stateHash = (stateHash ^ calendar::weatherDisplayHash(*weather)) * 16777619UL;
-  if (status == calendar::DisplayStatus::Calendar && footer)
-    stateHash = (stateHash ^ calendar::footerDisplayHash(*footer)) * 16777619UL;
-  if (gLastDisplayMarker == kDisplayHashMarker && gLastDisplayHash == stateHash) {
-    Serial.println("Calendar render skipped: visible content unchanged");
+    if (status == calendar::DisplayStatus::Calendar) {
+      if (!drawCalendar(events, eventCount, date, batteryTenthsVolts, weather ? *weather : calendar::WeatherData{},
+                        footer ? *footer : calendar::FooterStatus{})) {
+        Serial.println("Calendar render failed: display target refresh failed");
+        return false;
+      }
+    } else {
+      if (!display_calendar_begin()) {
+        Serial.println("Calendar render failed: display buffer allocation failed");
+        return false;
+      }
+      drawStatus(status, provisioningSsid, detail);
+      if (!display_calendar_refresh()) {
+        Serial.println("Calendar render failed: e-paper refresh failed");
+        return false;
+      }
+    }
+    gLastDisplayHash = stateHash;
+    gLastDisplayMarker = kDisplayHashMarker;
+    Serial.println("Calendar render performed");
     return true;
   }
 
-  if (status == calendar::DisplayStatus::Calendar) {
-    if (!drawCalendar(events, eventCount, date, batteryTenthsVolts, weather ? *weather : calendar::WeatherData{},
-                      footer ? *footer : calendar::FooterStatus{})) {
-      Serial.println("Calendar render failed: display target refresh failed");
-      return false;
+  void enterDeepSleep(bool displayInitialized, calendar::WifiManager &wifiManager) {
+    if (displayInitialized) {
+      display_sleep();
     }
-  } else {
-    if (!display_calendar_begin()) {
-      Serial.println("Calendar render failed: display buffer allocation failed");
-      return false;
-    }
-    drawStatus(status, provisioningSsid, detail);
-    if (!display_calendar_refresh()) {
-      Serial.println("Calendar render failed: e-paper refresh failed");
-      return false;
-    }
-  }
-  gLastDisplayHash = stateHash;
-  gLastDisplayMarker = kDisplayHashMarker;
-  Serial.println("Calendar render performed");
-  return true;
-}
-
-void enterDeepSleep(bool displayInitialized, calendar::WifiManager &wifiManager) {
-  if (displayInitialized) {
-    display_sleep();
-  }
-  wifiManager.disconnect();
-  const uint64_t sleepMicros = static_cast<uint64_t>(gRefreshIntervalSeconds) * 1000000ULL;
-  esp_sleep_enable_timer_wakeup(sleepMicros);
+    wifiManager.disconnect();
+    const uint64_t sleepMicros = static_cast<uint64_t>(gRefreshIntervalSeconds) * 1000000ULL;
+    esp_sleep_enable_timer_wakeup(sleepMicros);
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
-  if (pDevice != nullptr) {
-    pins_init();
-    const esp_err_t keyWakeResult =
-      esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(pDevice->interrupt_pin), 0);
-    if (keyWakeResult != ESP_OK) {
-      Serial.printf("KEY3 GPIO wake setup failed: %d\n", static_cast<int>(keyWakeResult));
+    if (pDevice != nullptr) {
+      pins_init();
+      const esp_err_t keyWakeResult = esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(pDevice->interrupt_pin), 0);
+      if (keyWakeResult != ESP_OK) {
+        Serial.printf("KEY3 GPIO wake setup failed: %d\n", static_cast<int>(keyWakeResult));
+      }
+    } else {
+      Serial.println("KEY3 GPIO wake unavailable: board device configuration is missing");
     }
-  } else {
-    Serial.println("KEY3 GPIO wake unavailable: board device configuration is missing");
-  }
-  if (gPendingManualRefreshMarker == kPendingManualRefreshValue) {
-    Serial.println("KEY3 pressed while awake; restarting into an immediate refresh");
-    Serial.flush();
-    ESP.restart();
-  }
+    if (gPendingManualRefreshMarker == kPendingManualRefreshValue) {
+      Serial.println("KEY3 pressed while awake; restarting into an immediate refresh");
+      Serial.flush();
+      ESP.restart();
+    }
 #else
-  Serial.println("KEY3 GPIO wake unavailable: this calendar wake implementation requires ESP32-S3");
+    Serial.println("KEY3 GPIO wake unavailable: this calendar wake implementation requires ESP32-S3");
 #endif
-  Serial.printf("Sleeping for %lu seconds\n",
-                static_cast<unsigned long>(gRefreshIntervalSeconds));
-  Serial.println("Entering deep sleep");
-  Serial.flush();
-  esp_deep_sleep_start();
-}
+    Serial.printf("Sleeping for %lu seconds\n", static_cast<unsigned long>(gRefreshIntervalSeconds));
+    Serial.println("Entering deep sleep");
+    Serial.flush();
+    esp_deep_sleep_start();
+  }
 
 } // namespace
 
@@ -238,12 +229,11 @@ void calendar_app_setup() {
   gRefreshIntervalSeconds = calendarSettings.refreshIntervalSeconds;
   const esp_sleep_wakeup_cause_t wakeCause = esp_sleep_get_wakeup_cause();
   const bool timerWake = wakeCause == ESP_SLEEP_WAKEUP_TIMER;
-  const bool gpioWake = wakeCause == ESP_SLEEP_WAKEUP_GPIO || wakeCause == ESP_SLEEP_WAKEUP_EXT0 ||
-                        wakeCause == ESP_SLEEP_WAKEUP_EXT1;
+  const bool gpioWake =
+    wakeCause == ESP_SLEEP_WAKEUP_GPIO || wakeCause == ESP_SLEEP_WAKEUP_EXT0 || wakeCause == ESP_SLEEP_WAKEUP_EXT1;
   const bool pendingManualRefresh = gPendingManualRefreshMarker == kPendingManualRefreshValue;
   gPendingManualRefreshMarker = 0;
-  const calendar::WakeReason wakeReason =
-    calendar::classifyWakeReason(timerWake, gpioWake || pendingManualRefresh);
+  const calendar::WakeReason wakeReason = calendar::classifyWakeReason(timerWake, gpioWake || pendingManualRefresh);
   switch (wakeReason) {
   case calendar::WakeReason::ColdBootOrReset:
     Serial.println("Calendar boot; wake reason cold boot/reset");
@@ -380,10 +370,10 @@ void calendar_app_setup() {
   }
 
   const calendar::CalendarRange feedRange = {
-    calendar::calendarTodayRange(today).startEpoch,
-    calendar::calendarRestOfWeekRange(today).endEpoch,
-    today,
-    calendar::calendarRestOfWeekRange(today).endDate,
+      calendar::calendarTodayRange(today).startEpoch,
+      calendar::calendarRestOfWeekRange(today).endEpoch,
+      today,
+      calendar::calendarRestOfWeekRange(today).endDate,
   };
   calendar::IcalendarFeedProvider provider(calendarFeedUrl, feedRange);
   calendar::CalendarEvent events[calendar::kMaxEvents] = {};
@@ -407,7 +397,8 @@ void calendar_app_setup() {
   if (calendar::localTimeFromEpoch(static_cast<int64_t>(time(nullptr)), stampDate, stampHour, stampMinute))
     snprintf(updated, sizeof(updated), "%02u:%02u", stampHour, stampMinute);
   footer.lastUpdated = updated;
-  renderIfChanged(calendar::DisplayStatus::Calendar, today, events, eventCount, batteryTenthsVolts, "", "", &weather, &footer);
+  renderIfChanged(calendar::DisplayStatus::Calendar, today, events, eventCount, batteryTenthsVolts, "", "", &weather,
+                  &footer);
   enterDeepSleep(true, wifiManager);
 }
 

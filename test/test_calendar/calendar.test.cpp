@@ -6,52 +6,51 @@
 #include <calendar/mock_calendar_provider.h>
 #include <calendar/settings.h>
 #include <calendar/wake_reason.h>
-#include <calendar/weather_icons.h>
 #include <calendar/weather_client.h>
-#include <unity.h>
-
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
+#include <calendar/weather_icons.h>
 #include <cstdio>
 #include <fstream>
 #include <memory>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unity.h>
 #include <vector>
 
 namespace {
 
-calendar::CalendarEvent eventAt(const char *id, int64_t start, int64_t end, bool allDay = false) {
-  calendar::CalendarEvent event = {};
-  strncpy(event.id, id, sizeof(event.id) - 1);
-  event.allDay = allDay;
-  if (allDay) {
-    event.allDayStartDate = calendar::calendarDateFromEpoch(start);
-    event.allDayEndDate = calendar::calendarDateFromEpoch(end);
-  } else {
-    event.startEpoch = start;
-    event.endEpoch = end;
+  calendar::CalendarEvent eventAt(const char *id, int64_t start, int64_t end, bool allDay = false) {
+    calendar::CalendarEvent event = {};
+    strncpy(event.id, id, sizeof(event.id) - 1);
+    event.allDay = allDay;
+    if (allDay) {
+      event.allDayStartDate = calendar::calendarDateFromEpoch(start);
+      event.allDayEndDate = calendar::calendarDateFromEpoch(end);
+    } else {
+      event.startEpoch = start;
+      event.endEpoch = end;
+    }
+    return event;
   }
-  return event;
-}
 
-void setLondonTimezoneForTest(void) {
+  void setLondonTimezoneForTest(void) {
 #if defined(_WIN32)
-  _putenv_s("TZ", calendar::kTimezoneRule);
-  _tzset();
+    _putenv_s("TZ", calendar::kTimezoneRule);
+    _tzset();
 #else
-  setenv("TZ", calendar::kTimezoneRule, 1);
-  tzset();
+    setenv("TZ", calendar::kTimezoneRule, 1);
+    tzset();
 #endif
-}
+  }
 
 } // namespace
 
 void test_range_selection_sorts_events_by_start(void) {
   const calendar::CalendarRange range = {100, 500};
   const calendar::CalendarEvent events[] = {
-    eventAt("later", 300, 340),
-    eventAt("earlier", 120, 180),
-    eventAt("middle", 200, 230),
+      eventAt("later", 300, 340),
+      eventAt("earlier", 120, 180),
+      eventAt("middle", 200, 230),
   };
   calendar::CalendarEvent selected[3];
 
@@ -66,9 +65,9 @@ void test_range_selection_sorts_events_by_start(void) {
 void test_range_selection_keeps_earliest_events_when_capacity_is_limited(void) {
   const calendar::CalendarRange range = {100, 500};
   const calendar::CalendarEvent events[] = {
-    eventAt("latest", 400, 450),
-    eventAt("earliest", 120, 150),
-    eventAt("middle", 250, 300),
+      eventAt("latest", 400, 450),
+      eventAt("earliest", 120, 150),
+      eventAt("middle", 250, 300),
   };
   calendar::CalendarEvent selected[2];
 
@@ -83,9 +82,9 @@ void test_today_range_includes_overlapping_events(void) {
   const calendar::CalendarDate today = {2026, 10, 1};
   const calendar::CalendarRange range = calendar::calendarTodayRange(today);
   const calendar::CalendarEvent events[] = {
-    eventAt("previous-day", range.startEpoch - 3600, range.startEpoch + 3600),
-    eventAt("today", range.startEpoch + 3600, range.startEpoch + 7200),
-    eventAt("next-day", range.endEpoch, range.endEpoch + 3600),
+      eventAt("previous-day", range.startEpoch - 3600, range.startEpoch + 3600),
+      eventAt("today", range.startEpoch + 3600, range.startEpoch + 7200),
+      eventAt("next-day", range.endEpoch, range.endEpoch + 3600),
   };
   calendar::CalendarEvent selected[3];
 
@@ -101,10 +100,11 @@ void test_rest_of_week_excludes_today_and_ends_at_next_monday(void) {
   const calendar::CalendarRange today = calendar::calendarTodayRange(thursday);
   const calendar::CalendarRange week = calendar::calendarRestOfWeekRange(thursday);
   const calendar::CalendarEvent events[] = {
-    eventAt("today", today.startEpoch + 3600, today.startEpoch + 7200),
-    eventAt("friday", today.startEpoch + calendar::kSecondsPerDay, today.startEpoch + calendar::kSecondsPerDay + 3600),
-    eventAt("sunday", week.endEpoch - calendar::kSecondsPerDay, week.endEpoch - 60),
-    eventAt("monday", week.endEpoch, week.endEpoch + 3600),
+      eventAt("today", today.startEpoch + 3600, today.startEpoch + 7200),
+      eventAt("friday", today.startEpoch + calendar::kSecondsPerDay,
+              today.startEpoch + calendar::kSecondsPerDay + 3600),
+      eventAt("sunday", week.endEpoch - calendar::kSecondsPerDay, week.endEpoch - 60),
+      eventAt("monday", week.endEpoch, week.endEpoch + 3600),
   };
   calendar::CalendarEvent selected[4];
 
@@ -141,27 +141,19 @@ void test_saturday_and_sunday_week_boundaries(void) {
 }
 
 void test_month_year_and_leap_day_boundaries(void) {
-  TEST_ASSERT_EQUAL_UINT(1,
-                         calendar::calendarDateFromEpoch(calendar::calendarEpoch({2026, 1, 31}) +
-                                                         calendar::kSecondsPerDay)
-                           .day);
-  TEST_ASSERT_EQUAL_UINT(2,
-                         calendar::calendarDateFromEpoch(calendar::calendarEpoch({2026, 1, 31}) +
-                                                         calendar::kSecondsPerDay)
-                           .month);
+  TEST_ASSERT_EQUAL_UINT(
+    1, calendar::calendarDateFromEpoch(calendar::calendarEpoch({2026, 1, 31}) + calendar::kSecondsPerDay).day);
+  TEST_ASSERT_EQUAL_UINT(
+    2, calendar::calendarDateFromEpoch(calendar::calendarEpoch({2026, 1, 31}) + calendar::kSecondsPerDay).month);
   const calendar::CalendarDate newYear =
     calendar::calendarDateFromEpoch(calendar::calendarEpoch({2026, 12, 31}) + calendar::kSecondsPerDay);
   TEST_ASSERT_EQUAL_INT(2027, newYear.year);
   TEST_ASSERT_EQUAL_UINT(1, newYear.month);
   TEST_ASSERT_EQUAL_UINT(1, newYear.day);
-  TEST_ASSERT_EQUAL_UINT(29,
-                         calendar::calendarDateFromEpoch(calendar::calendarEpoch({2024, 2, 28}) +
-                                                         calendar::kSecondsPerDay)
-                           .day);
-  TEST_ASSERT_EQUAL_UINT(3,
-                         calendar::calendarDateFromEpoch(calendar::calendarEpoch({2023, 2, 28}) +
-                                                         calendar::kSecondsPerDay)
-                           .month);
+  TEST_ASSERT_EQUAL_UINT(
+    29, calendar::calendarDateFromEpoch(calendar::calendarEpoch({2024, 2, 28}) + calendar::kSecondsPerDay).day);
+  TEST_ASSERT_EQUAL_UINT(
+    3, calendar::calendarDateFromEpoch(calendar::calendarEpoch({2023, 2, 28}) + calendar::kSecondsPerDay).month);
 }
 
 void test_london_timezone_uses_bst_and_gmt_transition_rules(void) {
@@ -170,20 +162,19 @@ void test_london_timezone_uses_bst_and_gmt_transition_rules(void) {
   unsigned hour = 0;
   unsigned minute = 0;
 
-  TEST_ASSERT_TRUE(calendar::localTimeFromEpoch(calendar::calendarEpoch({2026, 3, 29}, 0, 59), localDate, hour,
-                                                minute));
+  TEST_ASSERT_TRUE(
+    calendar::localTimeFromEpoch(calendar::calendarEpoch({2026, 3, 29}, 0, 59), localDate, hour, minute));
   TEST_ASSERT_EQUAL_UINT(0, hour);
   TEST_ASSERT_EQUAL_UINT(59, minute);
-  TEST_ASSERT_TRUE(calendar::localTimeFromEpoch(calendar::calendarEpoch({2026, 3, 29}, 1, 0), localDate, hour,
-                                                minute));
+  TEST_ASSERT_TRUE(calendar::localTimeFromEpoch(calendar::calendarEpoch({2026, 3, 29}, 1, 0), localDate, hour, minute));
   TEST_ASSERT_EQUAL_UINT(2, hour);
   TEST_ASSERT_EQUAL_UINT(0, minute);
-  TEST_ASSERT_TRUE(calendar::localTimeFromEpoch(calendar::calendarEpoch({2026, 10, 25}, 0, 59), localDate, hour,
-                                                minute));
+  TEST_ASSERT_TRUE(
+    calendar::localTimeFromEpoch(calendar::calendarEpoch({2026, 10, 25}, 0, 59), localDate, hour, minute));
   TEST_ASSERT_EQUAL_UINT(1, hour);
   TEST_ASSERT_EQUAL_UINT(59, minute);
-  TEST_ASSERT_TRUE(calendar::localTimeFromEpoch(calendar::calendarEpoch({2026, 10, 25}, 1, 0), localDate, hour,
-                                                minute));
+  TEST_ASSERT_TRUE(
+    calendar::localTimeFromEpoch(calendar::calendarEpoch({2026, 10, 25}, 1, 0), localDate, hour, minute));
   TEST_ASSERT_EQUAL_UINT(1, hour);
   TEST_ASSERT_EQUAL_UINT(0, minute);
   TEST_ASSERT_EQUAL_INT64(-1, calendar::localDateTimeEpoch({2026, 3, 29}, 1, 30));
@@ -212,12 +203,11 @@ void test_display_state_hash_is_stable_and_tracks_visible_content(void) {
   const calendar::CalendarDate date = {2026, 10, 1};
   const int64_t today = calendar::localDateTimeEpoch(date);
   calendar::CalendarEvent events[] = {
-    eventAt("today-event", today + 9 * 3600, today + 10 * 3600),
-    eventAt("next-week", calendar::localDateTimeEpoch({2026, 10, 5}),
-            calendar::localDateTimeEpoch({2026, 10, 5}) + 3600),
+      eventAt("today-event", today + 9 * 3600, today + 10 * 3600),
+      eventAt("next-week", calendar::localDateTimeEpoch({2026, 10, 5}),
+              calendar::localDateTimeEpoch({2026, 10, 5}) + 3600),
   };
-  const uint32_t original =
-    calendar::displayStateHash(calendar::DisplayStatus::Calendar, date, events, 2, 41);
+  const uint32_t original = calendar::displayStateHash(calendar::DisplayStatus::Calendar, date, events, 2, 41);
 
   TEST_ASSERT_EQUAL_UINT32(original,
                            calendar::displayStateHash(calendar::DisplayStatus::Calendar, date, events, 2, 41));
@@ -225,12 +215,11 @@ void test_display_state_hash_is_stable_and_tracks_visible_content(void) {
   TEST_ASSERT_EQUAL_UINT32(original,
                            calendar::displayStateHash(calendar::DisplayStatus::Calendar, date, events, 2, 41));
   events[0].title[0] = 'X';
-  TEST_ASSERT_NOT_EQUAL(original,
-                        calendar::displayStateHash(calendar::DisplayStatus::Calendar, date, events, 2, 41));
+  TEST_ASSERT_NOT_EQUAL(original, calendar::displayStateHash(calendar::DisplayStatus::Calendar, date, events, 2, 41));
   TEST_ASSERT_NOT_EQUAL(original,
                         calendar::displayStateHash(calendar::DisplayStatus::Calendar, {2026, 10, 2}, events, 2, 41));
-  TEST_ASSERT_NOT_EQUAL(original,
-                        calendar::displayStateHash(calendar::DisplayStatus::WifiConnectionFailed, date, nullptr, 0, -1));
+  TEST_ASSERT_NOT_EQUAL(
+    original, calendar::displayStateHash(calendar::DisplayStatus::WifiConnectionFailed, date, nullptr, 0, -1));
 }
 
 void test_wake_reason_classifies_manual_timer_and_cold_boot(void) {
@@ -313,11 +302,10 @@ void test_icalendar_parser_unfolds_lines_and_converts_london_wall_time(void) {
   const calendar::CalendarRange range = calendar::calendarTodayRange(today);
   calendar::CalendarEvent events[calendar::kMaxEvents] = {};
   calendar::IcalendarParser parser(range, events, calendar::kMaxEvents);
-  const char feed[] =
-    "BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:school-pickup-uid\n"
-    "DTSTART;TZID=Europe/London:20261001T151500\n"
-    "DTEND;TZID=Europe/London:20261001T154500\n"
-    "SUMMARY:School pickup with an exceptionally long\n title\nEND:VEVENT\nEND:VCALENDAR\n";
+  const char feed[] = "BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:school-pickup-uid\n"
+                      "DTSTART;TZID=Europe/London:20261001T151500\n"
+                      "DTEND;TZID=Europe/London:20261001T154500\n"
+                      "SUMMARY:School pickup with an exceptionally long\n title\nEND:VEVENT\nEND:VCALENDAR\n";
 
   TEST_ASSERT_TRUE(parser.write(reinterpret_cast<const uint8_t *>(feed), sizeof(feed) - 1));
   TEST_ASSERT_TRUE(parser.finish());
@@ -332,9 +320,8 @@ void test_icalendar_parser_converts_utc_events_to_london_display_time(void) {
   const calendar::CalendarRange range = calendar::calendarTodayRange(today);
   calendar::CalendarEvent events[calendar::kMaxEvents] = {};
   calendar::IcalendarParser parser(range, events, calendar::kMaxEvents);
-  const char feed[] =
-    "BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:utc-event\nDTSTART:20261001T141500Z\n"
-    "DTEND:20261001T144500Z\nSUMMARY:UTC source event\nEND:VEVENT\nEND:VCALENDAR\n";
+  const char feed[] = "BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:utc-event\nDTSTART:20261001T141500Z\n"
+                      "DTEND:20261001T144500Z\nSUMMARY:UTC source event\nEND:VEVENT\nEND:VCALENDAR\n";
 
   TEST_ASSERT_TRUE(parser.write(reinterpret_cast<const uint8_t *>(feed), sizeof(feed) - 1));
   TEST_ASSERT_TRUE(parser.finish());
@@ -348,15 +335,15 @@ void test_icalendar_parser_converts_utc_events_to_london_display_time(void) {
 void test_icalendar_parser_rejects_unsupported_timezone_and_recurrence_explicitly(void) {
   const calendar::CalendarRange range = calendar::calendarTodayRange({2026, 10, 1});
   const char *feeds[] = {
-    "BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:timezone\nDTSTART;TZID=America/New_York:20261001T100000\n"
-    "DTEND;TZID=America/New_York:20261001T110000\nSUMMARY:Unsupported zone\nEND:VEVENT\nEND:VCALENDAR\n",
-    "BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:repeating\nDTSTART;TZID=Europe/London:20261001T100000\n"
-    "DTEND;TZID=Europe/London:20261001T110000\nRRULE:FREQ=WEEKLY\nSUMMARY:Repeating\n"
-    "END:VEVENT\nEND:VCALENDAR\n",
+      "BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:timezone\nDTSTART;TZID=America/New_York:20261001T100000\n"
+      "DTEND;TZID=America/New_York:20261001T110000\nSUMMARY:Unsupported zone\nEND:VEVENT\nEND:VCALENDAR\n",
+      "BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:repeating\nDTSTART;TZID=Europe/London:20261001T100000\n"
+      "DTEND;TZID=Europe/London:20261001T110000\nRRULE:FREQ=WEEKLY\nSUMMARY:Repeating\n"
+      "END:VEVENT\nEND:VCALENDAR\n",
   };
   const calendar::IcalendarError expected[] = {
-    calendar::IcalendarError::UnsupportedTimezone,
-    calendar::IcalendarError::UnsupportedRecurrence,
+      calendar::IcalendarError::UnsupportedTimezone,
+      calendar::IcalendarError::UnsupportedRecurrence,
   };
 
   for (size_t i = 0; i < 2; ++i) {
@@ -420,7 +407,8 @@ void test_host_settings_form_validates_and_persists_portal_submission(void) {
   TEST_ASSERT_TRUE(store->save(settings));
 
   calendar::CalendarSettings invalid = settings;
-  const char invalidForm[] = "calendar_url=http%3A%2F%2Fexample.com%2Ffeed.ics&refresh_interval=30&timezone=Mars%2FOlympus";
+  const char invalidForm[] =
+    "calendar_url=http%3A%2F%2Fexample.com%2Ffeed.ics&refresh_interval=30&timezone=Mars%2FOlympus";
   TEST_ASSERT_FALSE(calendar::applySettingsForm(invalidForm, invalid, error, sizeof(error)));
   TEST_ASSERT_TRUE(strlen(error) > 0);
   calendar::CalendarSettings reloaded = {};
@@ -456,13 +444,22 @@ calendar::WeatherData parsedWeatherFixture() {
 }
 void test_weather_wmo_mapping_and_url() {
   using calendar::WeatherCondition;
-  const int codes[] = {0,1,2,3,45,48,51,53,55,56,57,61,63,66,65,67,80,81,82,71,73,75,77,85,86,95,96,99,-1,1234};
-  const WeatherCondition expected[] = {WeatherCondition::Clear,WeatherCondition::PartlyCloudy,WeatherCondition::PartlyCloudy,WeatherCondition::Cloudy,
-    WeatherCondition::Fog,WeatherCondition::Fog,WeatherCondition::Drizzle,WeatherCondition::Drizzle,WeatherCondition::Drizzle,WeatherCondition::Drizzle,WeatherCondition::Drizzle,
-    WeatherCondition::Rain,WeatherCondition::Rain,WeatherCondition::Rain,WeatherCondition::HeavyRain,WeatherCondition::HeavyRain,WeatherCondition::HeavyRain,WeatherCondition::HeavyRain,WeatherCondition::HeavyRain,
-    WeatherCondition::Snow,WeatherCondition::Snow,WeatherCondition::Snow,WeatherCondition::Snow,WeatherCondition::Snow,WeatherCondition::Snow,
-    WeatherCondition::Thunderstorm,WeatherCondition::Thunderstorm,WeatherCondition::Thunderstorm,WeatherCondition::Unknown,WeatherCondition::Unknown};
-  for (size_t i = 0; i < sizeof(codes)/sizeof(codes[0]); ++i) TEST_ASSERT_EQUAL_INT(static_cast<int>(expected[i]), static_cast<int>(calendar::weatherConditionFromWmoCode(codes[i])));
+  const int codes[] = {0,  1,  2,  3,  45, 48, 51, 53, 55, 56, 57, 61, 63, 66, 65,
+                       67, 80, 81, 82, 71, 73, 75, 77, 85, 86, 95, 96, 99, -1, 1234};
+  const WeatherCondition expected[] = {
+      WeatherCondition::Clear,        WeatherCondition::PartlyCloudy, WeatherCondition::PartlyCloudy,
+      WeatherCondition::Cloudy,       WeatherCondition::Fog,          WeatherCondition::Fog,
+      WeatherCondition::Drizzle,      WeatherCondition::Drizzle,      WeatherCondition::Drizzle,
+      WeatherCondition::Drizzle,      WeatherCondition::Drizzle,      WeatherCondition::Rain,
+      WeatherCondition::Rain,         WeatherCondition::Rain,         WeatherCondition::HeavyRain,
+      WeatherCondition::HeavyRain,    WeatherCondition::HeavyRain,    WeatherCondition::HeavyRain,
+      WeatherCondition::HeavyRain,    WeatherCondition::Snow,         WeatherCondition::Snow,
+      WeatherCondition::Snow,         WeatherCondition::Snow,         WeatherCondition::Snow,
+      WeatherCondition::Snow,         WeatherCondition::Thunderstorm, WeatherCondition::Thunderstorm,
+      WeatherCondition::Thunderstorm, WeatherCondition::Unknown,      WeatherCondition::Unknown};
+  for (size_t i = 0; i < sizeof(codes) / sizeof(codes[0]); ++i)
+    TEST_ASSERT_EQUAL_INT(static_cast<int>(expected[i]),
+                          static_cast<int>(calendar::weatherConditionFromWmoCode(codes[i])));
   char url[512];
   TEST_ASSERT_TRUE(calendar::buildWeatherUrl(url, sizeof(url), 51.5074, -0.1278));
   TEST_ASSERT_NOT_NULL(strstr(url, "latitude=51.507400&longitude=-0.127800"));
@@ -483,7 +480,18 @@ void test_weather_parser_preserves_cache_on_invalid_response() {
     TEST_ASSERT_FALSE(calendar::parseWeatherResponse(bad, strlen(bad), weather, 456));
     TEST_ASSERT_EQUAL_MEMORY(&before, &weather, sizeof(weather));
   }
-  const char *fields[] = {"temperature_2m", "apparent_temperature", "wind_speed_10m", "weather_code", "is_day", "time", "temperature_2m_max", "temperature_2m_min", "precipitation_probability_max", "sunrise", "sunset"};
+  const char *fields[] = {
+      "temperature_2m",
+      "apparent_temperature",
+      "wind_speed_10m",
+      "weather_code",
+      "is_day",
+      "time",
+      "temperature_2m_max",
+      "temperature_2m_min",
+      "precipitation_probability_max",
+      "sunrise",
+      "sunset"};
   for (const char *field : fields) {
     std::string bad = json;
     const std::string key = std::string("\"") + field + "\"";
@@ -494,11 +502,21 @@ void test_weather_parser_preserves_cache_on_invalid_response() {
   TEST_ASSERT_FALSE(calendar::parseWeatherResponse(json.c_str(), json.find_last_of('}'), weather, 456));
   const std::string oversized(4097, ' ');
   TEST_ASSERT_FALSE(calendar::parseWeatherResponse(oversized.c_str(), oversized.size(), weather, 456));
-  const char *original[] = {"\"is_day\":1", "\"temperature_2m\":14.2", "\"weather_code\":[2,61,0]",
-                            "\"precipitation_probability_max\":[20,80,5]", "2026-10-01T07:01", "2026-10-03"};
-  const char *replacement[] = {"\"is_day\":2", "\"temperature_2m\":null", "\"weather_code\":[2,null,0]",
-                               "\"precipitation_probability_max\":[101,80,5]", "2026-10-01T25:01", "2026-02-30"};
-  for (size_t i = 0; i < sizeof(original)/sizeof(original[0]); ++i) {
+  const char *original[] = {
+      "\"is_day\":1",
+      "\"temperature_2m\":14.2",
+      "\"weather_code\":[2,61,0]",
+      "\"precipitation_probability_max\":[20,80,5]",
+      "2026-10-01T07:01",
+      "2026-10-03"};
+  const char *replacement[] = {
+      "\"is_day\":2",
+      "\"temperature_2m\":null",
+      "\"weather_code\":[2,null,0]",
+      "\"precipitation_probability_max\":[101,80,5]",
+      "2026-10-01T25:01",
+      "2026-02-30"};
+  for (size_t i = 0; i < sizeof(original) / sizeof(original[0]); ++i) {
     std::string bad = json;
     bad.replace(bad.find(original[i]), strlen(original[i]), replacement[i]);
     TEST_ASSERT_FALSE(calendar::parseWeatherResponse(bad.c_str(), bad.size(), weather, 456));
@@ -508,13 +526,16 @@ void test_weather_parser_preserves_cache_on_invalid_response() {
   unknown.replace(unknown.find("\"weather_code\":2"), 16, "\"weather_code\":1234");
   calendar::WeatherData unknownWeather = {};
   TEST_ASSERT_TRUE(calendar::parseWeatherResponse(unknown.c_str(), unknown.size(), unknownWeather, 456));
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(calendar::WeatherCondition::Unknown), static_cast<int>(unknownWeather.current.condition));
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(calendar::WeatherIcon::Cloudy), static_cast<int>(calendar::getWeatherIcon(unknownWeather.current.condition, true)));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(calendar::WeatherCondition::Unknown),
+                        static_cast<int>(unknownWeather.current.condition));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(calendar::WeatherIcon::Cloudy),
+                        static_cast<int>(calendar::getWeatherIcon(unknownWeather.current.condition, true)));
   std::string night = json;
   night.replace(night.find("\"is_day\":1"), 10, "\"is_day\":0");
   TEST_ASSERT_TRUE(calendar::parseWeatherResponse(night.c_str(), night.size(), weather, 456));
   TEST_ASSERT_FALSE(weather.current.isDay);
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(calendar::WeatherIcon::PartlyCloudyNight), static_cast<int>(calendar::getWeatherIcon(weather.current.condition, weather.current.isDay)));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(calendar::WeatherIcon::PartlyCloudyNight),
+                        static_cast<int>(calendar::getWeatherIcon(weather.current.condition, weather.current.isDay)));
 }
 void test_weather_hash_tracks_visible_values() {
   auto weather = parsedWeatherFixture();
@@ -551,13 +572,18 @@ void test_host_fixture_provider_renders_shared_800_by_480_png(void) {
     }
     unsigned bitmapCount = 0;
     unsigned refreshCount = 0;
-    bool refresh() override { ++refreshCount; return HostDisplayTarget::refresh(); }
+    bool refresh() override {
+      ++refreshCount;
+      return HostDisplayTarget::refresh();
+    }
   };
   BoundsCheckedDisplay display(path);
-  TEST_ASSERT_TRUE(calendar::renderCalendar(display, events, count, today, "test", "calendar-host", -1, parsedWeatherFixture()));
+  TEST_ASSERT_TRUE(
+    calendar::renderCalendar(display, events, count, today, "test", "calendar-host", -1, parsedWeatherFixture()));
   TEST_ASSERT_EQUAL_UINT(7, display.bitmapCount);
   TEST_ASSERT_EQUAL_UINT(1, display.refreshCount);
-  TEST_ASSERT_TRUE(calendar::renderCalendar(display, events, count, today, "test", "calendar-host", -1, calendar::WeatherData{}));
+  TEST_ASSERT_TRUE(
+    calendar::renderCalendar(display, events, count, today, "test", "calendar-host", -1, calendar::WeatherData{}));
   TEST_ASSERT_EQUAL_UINT(10, display.bitmapCount);
   TEST_ASSERT_EQUAL_UINT(2, display.refreshCount);
   std::ifstream file(path, std::ios::binary);
@@ -568,11 +594,9 @@ void test_host_fixture_provider_renders_shared_800_by_480_png(void) {
   TEST_ASSERT_EQUAL_UINT8('P', header[1]);
   TEST_ASSERT_EQUAL_UINT8('N', header[2]);
   TEST_ASSERT_EQUAL_UINT8('G', header[3]);
-  TEST_ASSERT_EQUAL_UINT(800, (static_cast<uint32_t>(header[16]) << 24) |
-                                (static_cast<uint32_t>(header[17]) << 16) |
+  TEST_ASSERT_EQUAL_UINT(800, (static_cast<uint32_t>(header[16]) << 24) | (static_cast<uint32_t>(header[17]) << 16) |
                                 (static_cast<uint32_t>(header[18]) << 8) | header[19]);
-  TEST_ASSERT_EQUAL_UINT(480, (static_cast<uint32_t>(header[20]) << 24) |
-                                (static_cast<uint32_t>(header[21]) << 16) |
+  TEST_ASSERT_EQUAL_UINT(480, (static_cast<uint32_t>(header[20]) << 24) | (static_cast<uint32_t>(header[21]) << 16) |
                                 (static_cast<uint32_t>(header[22]) << 8) | header[23]);
   TEST_ASSERT_EQUAL_UINT8(1, header[24]);
   file.close();
@@ -582,28 +606,32 @@ void test_host_fixture_provider_renders_shared_800_by_480_png(void) {
 void test_weather_conditions_map_to_lucide_icons_with_cloud_fallback(void) {
   using calendar::WeatherCondition;
   using calendar::WeatherIcon;
-  struct Mapping { WeatherCondition condition; WeatherIcon day; WeatherIcon night; };
+  struct Mapping {
+    WeatherCondition condition;
+    WeatherIcon day;
+    WeatherIcon night;
+  };
   const Mapping cases[] = {
-    {WeatherCondition::Clear, WeatherIcon::Sunny, WeatherIcon::ClearNight},
-    {WeatherCondition::PartlyCloudy, WeatherIcon::PartlyCloudy, WeatherIcon::PartlyCloudyNight},
-    {WeatherCondition::Cloudy, WeatherIcon::Cloudy, WeatherIcon::Cloudy},
-    {WeatherCondition::Overcast, WeatherIcon::Cloudy, WeatherIcon::Cloudy},
-    {WeatherCondition::Drizzle, WeatherIcon::Drizzle, WeatherIcon::Drizzle},
-    {WeatherCondition::Rain, WeatherIcon::Rain, WeatherIcon::Rain},
-    {WeatherCondition::HeavyRain, WeatherIcon::HeavyRain, WeatherIcon::HeavyRain},
-    {WeatherCondition::Thunderstorm, WeatherIcon::Thunderstorm, WeatherIcon::Thunderstorm},
-    {WeatherCondition::Snow, WeatherIcon::Snow, WeatherIcon::Snow},
-    {WeatherCondition::Fog, WeatherIcon::Fog, WeatherIcon::Fog},
-    {WeatherCondition::Mist, WeatherIcon::Fog, WeatherIcon::Fog},
-    {WeatherCondition::Wind, WeatherIcon::Wind, WeatherIcon::Wind},
-    {WeatherCondition::Unknown, WeatherIcon::Cloudy, WeatherIcon::Cloudy},
-    {static_cast<WeatherCondition>(255), WeatherIcon::Cloudy, WeatherIcon::Cloudy},
+      {WeatherCondition::Clear, WeatherIcon::Sunny, WeatherIcon::ClearNight},
+      {WeatherCondition::PartlyCloudy, WeatherIcon::PartlyCloudy, WeatherIcon::PartlyCloudyNight},
+      {WeatherCondition::Cloudy, WeatherIcon::Cloudy, WeatherIcon::Cloudy},
+      {WeatherCondition::Overcast, WeatherIcon::Cloudy, WeatherIcon::Cloudy},
+      {WeatherCondition::Drizzle, WeatherIcon::Drizzle, WeatherIcon::Drizzle},
+      {WeatherCondition::Rain, WeatherIcon::Rain, WeatherIcon::Rain},
+      {WeatherCondition::HeavyRain, WeatherIcon::HeavyRain, WeatherIcon::HeavyRain},
+      {WeatherCondition::Thunderstorm, WeatherIcon::Thunderstorm, WeatherIcon::Thunderstorm},
+      {WeatherCondition::Snow, WeatherIcon::Snow, WeatherIcon::Snow},
+      {WeatherCondition::Fog, WeatherIcon::Fog, WeatherIcon::Fog},
+      {WeatherCondition::Mist, WeatherIcon::Fog, WeatherIcon::Fog},
+      {WeatherCondition::Wind, WeatherIcon::Wind, WeatherIcon::Wind},
+      {WeatherCondition::Unknown, WeatherIcon::Cloudy, WeatherIcon::Cloudy},
+      {static_cast<WeatherCondition>(255), WeatherIcon::Cloudy, WeatherIcon::Cloudy},
   };
   for (const Mapping &mapping : cases) {
     TEST_ASSERT_EQUAL_UINT(static_cast<unsigned>(mapping.day),
-        static_cast<unsigned>(calendar::getWeatherIcon(mapping.condition, true)));
+                           static_cast<unsigned>(calendar::getWeatherIcon(mapping.condition, true)));
     TEST_ASSERT_EQUAL_UINT(static_cast<unsigned>(mapping.night),
-        static_cast<unsigned>(calendar::getWeatherIcon(mapping.condition, false)));
+                           static_cast<unsigned>(calendar::getWeatherIcon(mapping.condition, false)));
   }
   for (const uint8_t size : {calendar::WeatherIcons::FORECAST_SIZE, calendar::WeatherIcons::CURRENT_SIZE}) {
     for (unsigned index = 0; index <= static_cast<unsigned>(WeatherIcon::Wind); ++index) {
@@ -613,7 +641,8 @@ void test_weather_conditions_map_to_lucide_icons_with_cloud_fallback(void) {
       TEST_ASSERT_EQUAL_UINT(size, asset.height);
       const unsigned pitch = (size + 7) / 8;
       bool hasInk = false;
-      for (unsigned byte = 0; byte < pitch * size; ++byte) hasInk |= asset.bitmap[byte] != 0;
+      for (unsigned byte = 0; byte < pitch * size; ++byte)
+        hasInk |= asset.bitmap[byte] != 0;
       TEST_ASSERT_TRUE(hasInk);
       // All Lucide strokes retain whitespace inside their asset bounds.
       for (unsigned byte = 0; byte < pitch; ++byte) {
@@ -622,7 +651,7 @@ void test_weather_conditions_map_to_lucide_icons_with_cloud_fallback(void) {
       }
     }
     TEST_ASSERT_EQUAL_PTR(calendar::WeatherIcons::asset(WeatherIcon::Cloudy, size).bitmap,
-        calendar::WeatherIcons::asset(static_cast<WeatherIcon>(255), size).bitmap);
+                          calendar::WeatherIcons::asset(static_cast<WeatherIcon>(255), size).bitmap);
   }
 }
 
@@ -640,18 +669,17 @@ void test_host_provider_error_and_missing_configuration_are_clean(void) {
   TEST_ASSERT_EQUAL_STRING("Calendar URL is not configured.", missingProvider.error());
 }
 
-
 void test_today_timed_glyph_bounds_are_centered() {
   class CheckedDisplay : public calendar::HostDisplayTarget {
   public:
     CheckedDisplay() : HostDisplayTarget(".dev/timed-alignment-preview.png") {}
-    void roundRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint8_t r,
-                   calendar::DisplayColor fill, calendar::DisplayColor border) override {
+    void roundRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint8_t r, calendar::DisplayColor fill,
+                   calendar::DisplayColor border) override {
       if (x == 16 && h == 72) cardY = y;
       HostDisplayTarget::roundRect(x, y, w, h, r, fill, border);
     }
-    void text(uint16_t x, uint16_t y, const char *value, uint8_t font,
-              calendar::DisplayColor fg, calendar::DisplayColor bg) override {
+    void text(uint16_t x, uint16_t y, const char *value, uint8_t font, calendar::DisplayColor fg,
+              calendar::DisplayColor bg) override {
       if ((x == 29 || x == 140) && y >= 128 && y < 448) {
         if (cardY == 292 && x == 140) {
           TEST_ASSERT_EQUAL_UINT(cardY + (font == calendar::kCalendarFontTitle ? 17 : 43) + fontHeight(font), y);
@@ -672,9 +700,9 @@ void test_today_timed_glyph_bounds_are_centered() {
   const calendar::CalendarDate date = {2026, 10, 2};
   const auto range = calendar::calendarTodayRange(date);
   calendar::CalendarEvent events[] = {
-    eventAt("short", range.startEpoch + 45000, range.startEpoch + 46800),
-    eventAt("long", range.startEpoch + 54900, range.startEpoch + 56700),
-    eventAt("metadata", range.startEpoch + 60000, range.startEpoch + 61800),
+      eventAt("short", range.startEpoch + 45000, range.startEpoch + 46800),
+      eventAt("long", range.startEpoch + 54900, range.startEpoch + 56700),
+      eventAt("metadata", range.startEpoch + 60000, range.startEpoch + 61800),
   };
   snprintf(events[0].title, sizeof(events[0].title), "DUMP RUN");
   snprintf(events[1].title, sizeof(events[1].title), "Pick up Isla after school");
@@ -689,8 +717,8 @@ void test_today_groups_all_day_cards_and_preserves_text_backgrounds() {
   class CheckedDisplay : public calendar::HostDisplayTarget {
   public:
     CheckedDisplay() : HostDisplayTarget("today-preview-test.png") {}
-    void roundRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint8_t r,
-                   calendar::DisplayColor fill, calendar::DisplayColor border) override {
+    void roundRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint8_t r, calendar::DisplayColor fill,
+                   calendar::DisplayColor border) override {
       if (x == 16 && (h == 72 || h == 48)) {
         TEST_ASSERT_EQUAL_UINT(fills.empty() ? 128 : cardY + cardHeight + 10, y);
         TEST_ASSERT_EQUAL_UINT(fill == calendar::CalendarPatterns::Sidebar ? 48 : 72, h);
@@ -701,8 +729,8 @@ void test_today_groups_all_day_cards_and_preserves_text_backgrounds() {
       }
       HostDisplayTarget::roundRect(x, y, w, h, r, fill, border);
     }
-    void text(uint16_t x, uint16_t y, const char *value, uint8_t font,
-              calendar::DisplayColor fg, calendar::DisplayColor bg) override {
+    void text(uint16_t x, uint16_t y, const char *value, uint8_t font, calendar::DisplayColor fg,
+              calendar::DisplayColor bg) override {
       if (x < 458 && y >= 128 && y < 448) {
         TEST_ASSERT_EQUAL_UINT(calendar::CalendarColors::Foreground, fg);
         TEST_ASSERT_EQUAL_UINT(fills.back(), bg);
@@ -740,11 +768,11 @@ void test_today_groups_all_day_cards_and_preserves_text_backgrounds() {
   const calendar::CalendarDate date = {2026, 10, 1};
   const auto range = calendar::calendarTodayRange(date);
   calendar::CalendarEvent events[] = {
-    eventAt("late", range.startEpoch + 3600, range.startEpoch + 7200),
-    eventAt("day-first", calendar::calendarEpoch(date), calendar::calendarEpoch({2026, 10, 2}), true),
-    eventAt("overnight", range.startEpoch - 3600, range.startEpoch + 1800),
-    eventAt("day-second", calendar::calendarEpoch(date), calendar::calendarEpoch({2026, 10, 2}), true),
-    eventAt("multi-day", calendar::calendarEpoch({2026, 9, 30}), calendar::calendarEpoch({2026, 10, 2}), true),
+      eventAt("late", range.startEpoch + 3600, range.startEpoch + 7200),
+      eventAt("day-first", calendar::calendarEpoch(date), calendar::calendarEpoch({2026, 10, 2}), true),
+      eventAt("overnight", range.startEpoch - 3600, range.startEpoch + 1800),
+      eventAt("day-second", calendar::calendarEpoch(date), calendar::calendarEpoch({2026, 10, 2}), true),
+      eventAt("multi-day", calendar::calendarEpoch({2026, 9, 30}), calendar::calendarEpoch({2026, 10, 2}), true),
   };
   calendar::CalendarEvent selected[5];
   TEST_ASSERT_EQUAL_UINT(5, calendar::selectEventsForRange(events, 5, range, selected, 5));
@@ -766,7 +794,8 @@ void test_today_groups_all_day_cards_and_preserves_text_backgrounds() {
   // A single all-day card still precedes an overnight event and ordinary times.
   events[1] = eventAt("noon", range.startEpoch + 12 * 3600, range.startEpoch + 13 * 3600);
   events[3] = eventAt("morning", range.startEpoch + 9 * 3600, range.startEpoch + 10 * 3600);
-  for (auto &event : events) snprintf(event.title, sizeof(event.title), "%s", event.id);
+  for (auto &event : events)
+    snprintf(event.title, sizeof(event.title), "%s", event.id);
   display.fills.clear();
   display.times.clear();
   display.titles.clear();
@@ -788,8 +817,8 @@ void test_footer_fits_long_labels_and_keeps_cards_above_status_bar() {
   class CheckedDisplay : public calendar::HostDisplayTarget {
   public:
     CheckedDisplay() : HostDisplayTarget("footer-preview-test.png") {}
-    void text(uint16_t x, uint16_t y, const char *value, uint8_t font,
-              calendar::DisplayColor fg, calendar::DisplayColor bg) override {
+    void text(uint16_t x, uint16_t y, const char *value, uint8_t font, calendar::DisplayColor fg,
+              calendar::DisplayColor bg) override {
       if (y >= 448) {
         TEST_ASSERT_EQUAL_UINT(calendar::kCalendarFontStatus, font);
         TEST_ASSERT_TRUE(x >= 16 && x + textWidth(value, font) <= 784);
@@ -798,12 +827,15 @@ void test_footer_fits_long_labels_and_keeps_cards_above_status_bar() {
       }
       HostDisplayTarget::text(x, y, value, font, fg, bg);
     }
-    void roundRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint8_t r,
-                   calendar::DisplayColor fill, calendar::DisplayColor border) override {
+    void roundRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint8_t r, calendar::DisplayColor fill,
+                   calendar::DisplayColor border) override {
       if (y < 448) TEST_ASSERT_TRUE(y + h <= 448);
       HostDisplayTarget::roundRect(x, y, w, h, r, fill, border);
     }
-    bool refresh() override { ++refreshes; return HostDisplayTarget::refresh(); }
+    bool refresh() override {
+      ++refreshes;
+      return HostDisplayTarget::refresh();
+    }
     std::vector<std::string> labels;
     unsigned refreshes = 0;
   } display;
@@ -816,7 +848,8 @@ void test_footer_fits_long_labels_and_keeps_cards_above_status_bar() {
   footer.wifiConnected = true;
   footer.lastUpdated = "18:42";
   footer.batteryPercent = 72;
-  TEST_ASSERT_TRUE(calendar::renderCalendar(display, events, count, today, "test", "host", -1, parsedWeatherFixture(), footer));
+  TEST_ASSERT_TRUE(
+    calendar::renderCalendar(display, events, count, today, "test", "host", -1, parsedWeatherFixture(), footer));
   TEST_ASSERT_EQUAL_UINT(1, display.refreshes);
   TEST_ASSERT_EQUAL_UINT(4, display.labels.size());
   TEST_ASSERT_EQUAL_STRING("6 events today", display.labels[0].c_str());
@@ -828,14 +861,16 @@ void test_footer_fits_long_labels_and_keeps_cards_above_status_bar() {
   footer.lastUpdated = nullptr;
   footer.batteryPercent = -1;
   footer.batteryTenthsVolts = 39;
-  TEST_ASSERT_TRUE(calendar::renderCalendar(display, nullptr, 0, today, "test", "host", 39, calendar::WeatherData{}, footer));
+  TEST_ASSERT_TRUE(
+    calendar::renderCalendar(display, nullptr, 0, today, "test", "host", 39, calendar::WeatherData{}, footer));
   TEST_ASSERT_EQUAL_STRING("0 events today", display.labels[0].c_str());
   TEST_ASSERT_EQUAL_STRING("3.9V", display.labels[3].c_str());
   TEST_ASSERT_EQUAL_STRING("Last updated: --:--", display.labels[1].c_str());
   display.labels.clear();
   footer.todayEventCount = 1;
   footer.batteryPercent = 200;
-  TEST_ASSERT_TRUE(calendar::renderCalendar(display, nullptr, 0, today, "test", "host", -1, calendar::WeatherData{}, footer));
+  TEST_ASSERT_TRUE(
+    calendar::renderCalendar(display, nullptr, 0, today, "test", "host", -1, calendar::WeatherData{}, footer));
   TEST_ASSERT_EQUAL_STRING("1 event today", display.labels[0].c_str());
   TEST_ASSERT_EQUAL_STRING("100%", display.labels[3].c_str());
   remove("footer-preview-test.png");

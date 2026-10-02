@@ -343,9 +343,7 @@ void WifiCaptive::setPortalTickCallback(std::function<void()> func) { _tickCallb
 
 void WifiCaptive::setPortalTimeoutCallback(std::function<void()> callback) { _portalTimeoutCallback = callback; }
 
-void WifiCaptive::setConnectionTimeout(uint32_t timeoutMs) {
-  _connectionTimeoutMs = timeoutMs;
-}
+void WifiCaptive::setConnectionTimeout(uint32_t timeoutMs) { _connectionTimeoutMs = timeoutMs; }
 
 void WifiCaptive::setHostname(const String &hostname) { _hostname = hostname; }
 
@@ -384,8 +382,7 @@ void WifiCaptive::readWifiCredentials() {
 }
 
 void WifiCaptive::saveWifiCredentials(const WifiCredentials credentials) {
-  Log_info("Saving Wi-Fi credentials (Enterprise: %s)",
-           credentials.isEnterprise ? "yes" : "no");
+  Log_info("Saving Wi-Fi credentials (Enterprise: %s)", credentials.isEnterprise ? "yes" : "no");
 
   // Check if the credentials already exist
   for (u16_t i = 0; i < WIFI_MAX_SAVED_CREDS; i++) {
