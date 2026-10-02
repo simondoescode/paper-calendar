@@ -19,108 +19,62 @@ Its configured display wiring is SCK 7, MOSI 9, CS 44, reset 38, DC 10,
 busy 4. Battery measurement uses ADC pin 1 and enable pin 6. These are
 upstream definitions and must not be duplicated or changed for this calendar.
 
-## Display palette audit
+## Display palette and native grayscale
 
 The calendar target `TRMNL_7inch5_OG_DIY_Kit` selects the PlatformIO
 `seeed_xiao_esp32s3` board (ESP32-S3 / XIAO_ESP32S3 variant),
 `BOARD_XIAO_EPAPER_DISPLAY`, and device `xiao_epaper_display`. The device
 table in `src/display.cpp` selects `EPD_75`, with SCK/MOSI/CS/reset/DC/busy
-pins **7/9/44/38/10/4** and SPI at 8 MHz. `include/config.h` defines the
-panel-profile index; the board definition itself does not select a panel.
+pins **7/9/44/38/10/4** and SPI at 8 MHz.
 
-`display_init()` selects `dpList[EPD_75][iTempProfile].OneBit`, default
-temperature profile 0: **`EP75_800x480`, 7.5-inch, 800 x 480, UC8179 /
-UC81xx family, black/white**. Profile 1 selects `EP75_800x480_GEN2`;
-profile 2 uses the default one-bit type again. In the installed, pinned
-`bb_epaper` **2.1.9**, `src/bb_ep.inl` defines both one-bit panel entries
-with flags 0, `u8Colors_2clr`, and full/fast/partial waveforms. These select
-the two-colour pixel functions, not the three/four/seven-colour functions.
-The separately configured `_3CLR` and `_6CLR` targets are different panels
-and are not the calendar target.
+The shared TRMNL startup still initializes the panel with
+`dpList[EPD_75][iTempProfile].OneBit`. Immediately before calendar drawing,
+`display_calendar_begin()` now switches to the matching `TwoBit` profile
+and reinitializes the SPI panel interface in the same way as the inherited
+2-bpp PNG path. Depending on the saved temperature profile this selects
+`EP75_800x480_4GRAY`, `EP75_800x480_4GRAY_GEN2`, or
+`EP75_800x480_4GRAY_V2`.
 
-**Physical pigment colours are black and white.** This panel family also has
-waveform-driven intermediate grey levels: the upstream `TwoBit` entries
-select `EP75_800x480_4GRAY`, `_4GRAY_GEN2`, or `_4GRAY_V2`, using
-`BBEP_4GRAY` and two bit planes. Upstream PNG rendering can select those
-profiles, but the standalone calendar never does. Their greys are driven
-panel states rather than spatial dithering; they are not additional pigment
-colours. The driver's comments name GDEY075T7 for the one-bit older panel,
-GDEW075T7 for its older four-grey entry, and GDEY075T7-D2 for the newer
-four-grey entry. **The repository cannot establish the fitted glass's exact
-part number/revision or validate its grey quality.** These are configured
-driver profiles, not a hardware identification or physical test.
+The pinned `bb_epaper` driver marks these profiles with `BBEP_4GRAY`.
+`allocBuffer(false)` therefore allocates both 1-bit planes automatically:
+**48,000 bytes per plane, 96,000 bytes total** for an 800 x 480 frame.
+Each pixel's two plane bits select one of four waveform-driven grayscale
+states. These are physical e-paper gray states, not spatial dithering.
 
-Calendar `display_calendar_begin()` calls `allocBuffer(false)`: one packed
-**1-bit-per-pixel plane, 48,000 bytes**, with bit 0 = black and bit 1 = white.
-Refresh writes `PLANE_0` and uses `REFRESH_FULL`. Partial refresh in the
-one-bit profiles still supports only black/white; it does not enable grey
-or extra pigment colours. The four-grey panel entries have no partial
-waveform. Host pixels use one byte each, restricted to values 0/1, and are
-packed into an 800 x 480, 1-bit grayscale PNG; this is not a grey framebuffer.
+The calendar uses a semantic four-level palette:
 
-Driver constants are defined in the installed dependency
-`.pio/libdeps/TRMNL_7inch5_OG_DIY_Kit/bb_epaper/src/bb_epaper.h`:
+| Calendar colour | Logical sample | Intended appearance |
+| --- | ---: | --- |
+| `DisplayColor::Black` | 0 | Black |
+| `DisplayColor::DarkGrey` | 1 | Dark grey |
+| `DisplayColor::LightGrey` | 2 | Light grey |
+| `DisplayColor::White` | 3 | White |
 
-| Driver constant | Value | Meaning on the active calendar panel |
-| --- | --- | --- |
-| `BBEP_BLACK` | 0 | Physical black |
-| `BBEP_WHITE` | 1 | Physical white |
-| `BBEP_TRANSPARENT` | 255 | Text/sprite background control: preserve existing pixels; not a colour |
-| `BBEP_YELLOW`, `BBEP_RED` | 2, 3 | Other panel palettes; unsupported as colours here |
-| `BBEP_BLUE`, `BBEP_GREEN`, `BBEP_ORANGE` | 4, 5, 6 | Other panel palettes; unsupported as colours here |
-| `BBEP_GRAY0` through `BBEP_GRAY3` | 0 through 3 | Four-grey profile indices only; not calendar grey levels |
+These logical values are passed to `bb_epaper`, whose panel-specific lookup
+table converts them to the calibrated two-plane representation. The UI uses
+`CalendarColors::Sidebar` = `LightGrey` for the right-hand panel and
+all-day cards. The former `DitherLightGrey` token, `sidebarInk()`
+halftone predicate, and pixel-by-pixel dither rendering have been removed.
 
-Drawing APIs accept integer colour indices, not RGB. The one-bit colour
-lookup maps index 1 to white and all other low-nibble indices to black;
-passing another panel's constant does not produce that colour. Transparency
-is handled separately by APIs that support it. Four-grey indices run from
-black (`GRAY0`) through intermediate levels (`GRAY1`, `GRAY2`) to white
-(`GRAY3`) when the separate four-grey profile is active.
+Text, lines, rounded rectangles, circles and one-bit sprite masks can all
+request any of the four logical grayscale samples. Fonts and sprites remain
+binary coverage masks; the selected foreground/background colour determines
+which grayscale sample is written.
 
-The sidebar uses the custom spatial halftone predicate
-`((x + 2*y) & 3) == 0`: **25% black dots over the initially white buffer**,
-with alternate rows shifted by two pixels. Firmware fills only those black
-pixels; sidebar text uses transparent backgrounds to preserve the pattern.
-Host drawing applies the same predicate to each pixel. This is not native
-grey, a grey-to-monochrome conversion, or an unsupported colour approximation.
-The driver also offers `DITHER_NONE`, `DITHER_75`, `DITHER_50`,
-`DITHER_25_REG`, `DITHER_25_ALT`, `DITHER_12_REG`, and `DITHER_12_ALT`;
-the calendar does not invoke those APIs.
+Calendar refresh writes `PLANE_BOTH`. Partial refresh is not used for the
+four-gray calendar path. When the selected grayscale panel definition
+provides a fast waveform, the calendar uses `REFRESH_FAST`; otherwise it
+falls back to `REFRESH_FULL`. The content hash still prevents unnecessary
+refreshes when the visible calendar has not changed.
 
-| UI colour | Hardware representation | Supported in calendar |
-| --- | --- | --- |
-| Black | Black pigment, bit 0 | Yes |
-| White | White pigment, bit 1 | Yes |
-| Light grey sidebar | 25% black / 75% white spatial halftone | Yes, simulated |
-| Native intermediate grey | Separate four-grey waveforms/two planes | Not in the calendar mode |
-| Red, yellow, blue, green, orange | No corresponding pigment in this panel | No |
+The host emulator mirrors the same logical 0-3 framebuffer and writes an
+800 x 480 **2-bit grayscale PNG**. This keeps the desktop preview faithful
+to the firmware palette instead of simulating grey with black dots.
 
-The audit found only `DisplayColor::Black`, `DisplayColor::White`, and
-the former `DisplayColor::LightGrey` in the calendar drawing path. The last
-was used only for sidebar rectangle fill and sidebar text backgrounds; no
-unsupported colours were being drawn. Text, borders, cards, circles,
-weather/status sprites, and setup/error screens use black/white. Sprites
-are one-bit masks: 1 = ink in the requested solid colour, 0 = transparent.
-Compressed fonts likewise contain binary glyph coverage. Numeric 2 in the
-calendar bridge is a private pattern token, not `BBEP_YELLOW`; numeric 255
-is a transparent text background, not white or grey. No other framebuffer
-colour values or UI halftones were found.
-
-There are no custom RGB/HEX values in the panel UI. `#888` in
-`src/calendar/host_runtime.cpp` is a browser-only preview border and does
-not enter the display framebuffer. `#000000`, `#FFFFFF`, `#DDDDDD`, and
-`#999999` have no interpretation in `DisplayTarget` or its drawing bridge;
-there is no automatic RGB conversion for calendar drawing.
-
-Use the canonical palette in `include/calendar/display_target.h`:
-`CalendarColors::Background`, `Foreground`, and `Border` for solid white
-and black. `CalendarPatterns::Sidebar` (explicit `DitherLightGrey` token)
-and `sidebarInk()` define the existing simulated tone separately. Use this
-pattern only for rectangle fills over white and text backgrounds over an
-already patterned area; other embedded primitives require solid colours.
-Host and firmware share the predicate. Do not add arbitrary colour indices,
-RGB values, or native grey without explicitly changing and validating the
-panel mode. No layout, fonts, calendar logic, or networking changed.
+The exact intermediate shade and refresh quality still depend on the fitted
+panel revision and temperature profile. The repository can select the
+driver's existing calibrated profiles, but the first hardware release remains
+unvalidated until the physical TRMNL BYOD kit is available.
 
 ## Existing firmware and reuse boundary
 
@@ -260,8 +214,8 @@ if automatic upload mode does not start.
 
 The `calendar-host` PlatformIO environment runs the shared calendar model,
 event selection, calendar layout renderer, and `CalendarProvider` contract on
-the development machine. A native `DisplayTarget` draws into a monochrome
-framebuffer and writes an 800×480, 1-bit grayscale PNG. A small local HTTP
+the development machine. A native `DisplayTarget` draws into a four-level grayscale
+framebuffer and writes an 800×480, 2-bit grayscale PNG. A small local HTTP
 server provides a settings page and lifecycle controls.
 
 Build and run from the repository root:
@@ -346,7 +300,7 @@ adapter; on-device drawing still uses the existing `bb_epaper` buffer and
 `EPD_75` profile unchanged.
 
 Emulated: configuration edits/persistence, HTTPS, fixture or local-file provider
-flow, calendar date selection/layout, monochrome drawing, PNG output, and
+flow, calendar date selection/layout, grayscale drawing, PNG output, and
 manual refresh/reload actions.
 
 Not emulated: ESP32 instruction execution, Wi-Fi provisioning or NVS internals,
