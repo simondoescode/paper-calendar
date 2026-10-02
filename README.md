@@ -278,6 +278,26 @@ The host implementation also supports local configuration and calendar-feed deve
 
 See [docs/EINK_CALENDAR.md](docs/EINK_CALENDAR.md) for more detailed architecture and development notes.
 
+## Local development hooks
+
+Install the repository-managed Git hooks once after cloning:
+
+```bash
+python scripts/install_git_hooks.py
+```
+
+This sets the clone's local `core.hooksPath` to `.githooks`. Before each
+commit, staged C/C++ files are automatically formatted using the repository
+`.clang-format` rules, re-staged, and checked. CI uses clang-format 22.1.0,
+so keeping the same version installed locally gives identical formatter output.
+
+You can also run the formatter manually:
+
+```bash
+python scripts/format_changed.py
+python scripts/format_changed.py --check
+```
+
 ## Tests
 
 Run the calendar-specific host tests with:
