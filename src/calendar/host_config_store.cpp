@@ -3,11 +3,11 @@
 #if defined(CALENDAR_HOST)
 
 #include <errno.h>
-#include <stdlib.h>
-#include <iomanip>
 #include <fstream>
+#include <iomanip>
 #include <iterator>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <string>
 #if defined(_WIN32)
@@ -28,7 +28,8 @@ namespace calendar {
       char *end = nullptr;
       const double value = strtod(start, &end);
       if (end == start) return false;
-      while (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n') ++end;
+      while (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n')
+        ++end;
       if (*end != ',' && *end != '}') return false;
       output = value;
       return true;
