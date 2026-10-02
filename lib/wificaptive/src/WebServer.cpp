@@ -111,10 +111,10 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
     const double weatherLatitude = prefs.getDouble("weather_lat", WEATHER_LATITUDE);
     const double weatherLongitude = prefs.getDouble("weather_lon", WEATHER_LONGITUDE);
     prefs.end();
-    String response = String("{\"calendar_mode\":true,\"calendar_feed_configured\":") +
-                      (configured ? "true" : "false") +
-                      ",\"weather_latitude\":" + String(weatherLatitude, 6) +
-                      ",\"weather_longitude\":" + String(weatherLongitude, 6) + "}";
+    String response =
+      String("{\"calendar_mode\":true,\"calendar_feed_configured\":") + (configured ? "true" : "false") +
+      ",\"weather_latitude\":" + String(weatherLatitude, 6) + ",\"weather_longitude\":" +
+      String(weatherLongitude, 6) + "}";
     request->send(200, "application/json", response);
 #else
     prefs.end();
