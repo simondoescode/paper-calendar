@@ -420,8 +420,10 @@ void test_host_settings_form_validates_and_persists_portal_submission(void) {
   TEST_ASSERT_TRUE(reloaded.weatherLongitude > 151.209299 && reloaded.weatherLongitude < 151.209301);
   for (const char *coordinate : {"91", "nan", "abc", "", "12oops"}) {
     char badForm[256];
-    snprintf(badForm, sizeof(badForm), "calendar_url=fixture://default&refresh_interval=180&timezone=UTC"
-                                     "&weather_latitude=%s&weather_longitude=0", coordinate);
+    snprintf(badForm, sizeof(badForm),
+             "calendar_url=fixture://default&refresh_interval=180&timezone=UTC"
+             "&weather_latitude=%s&weather_longitude=0",
+             coordinate);
     TEST_ASSERT_FALSE(calendar::applySettingsForm(badForm, reloaded, error, sizeof(error)));
     TEST_ASSERT_TRUE(reloaded.weatherLatitude > -33.868801 && reloaded.weatherLatitude < -33.868799);
   }
