@@ -647,8 +647,11 @@ void test_today_groups_all_day_cards_and_preserves_text_backgrounds() {
     CheckedDisplay() : HostDisplayTarget("today-preview-test.png") {}
     void roundRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint8_t r,
                    calendar::DisplayColor fill, calendar::DisplayColor border) override {
-      if (x == 16 && h == 72) {
-        TEST_ASSERT_EQUAL_UINT(128 + fills.size() * 82, y);
+      if (x == 16 && (h == 72 || h == 48)) {
+        TEST_ASSERT_EQUAL_UINT(fills.empty() ? 128 : cardY + cardHeight + 10, y);
+        TEST_ASSERT_EQUAL_UINT(fill == calendar::CalendarPatterns::Sidebar ? 48 : 72, h);
+        cardY = y;
+        cardHeight = h;
         TEST_ASSERT_EQUAL_UINT(calendar::CalendarColors::Border, border);
         fills.push_back(fill);
       }
@@ -659,13 +662,21 @@ void test_today_groups_all_day_cards_and_preserves_text_backgrounds() {
       if (x < 458 && y >= 128 && y < 448) {
         TEST_ASSERT_EQUAL_UINT(calendar::CalendarColors::Foreground, fg);
         TEST_ASSERT_EQUAL_UINT(fills.back(), bg);
-        if (x == 29) times.emplace_back(value);
-        if (x == 140 && font == calendar::kCalendarFontTitle) titles.emplace_back(value);
+        if (x == 29) {
+          TEST_ASSERT_EQUAL_UINT(cardY + (cardHeight + fontHeight(font)) / 2, y);
+          times.emplace_back(value);
+        }
+        if (x == 140 && font == calendar::kCalendarFontTitle) {
+          TEST_ASSERT_EQUAL_UINT(cardHeight == 48 ? cardY + (cardHeight + fontHeight(font)) / 2
+                                                : cardY + 17 + fontHeight(font), y);
+          titles.emplace_back(value);
+        }
       }
       if (y >= 448 && strstr(value, "events today")) footer = value;
       HostDisplayTarget::text(x, y, value, font, fg, bg);
     }
     std::vector<calendar::DisplayColor> fills;
+    uint16_t cardY = 0, cardHeight = 0;
     std::vector<std::string> times, titles;
     std::string footer;
   } display;

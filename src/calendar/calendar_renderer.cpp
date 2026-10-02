@@ -40,6 +40,7 @@ constexpr uint16_t kCurrentWeatherWidth = 138;
 constexpr uint16_t kCurrentWeatherX = kLeftColumnWidth - kOuterPadding - kCurrentWeatherWidth;
 constexpr uint16_t kCardGap = 10;
 constexpr uint16_t kTodayCardHeight = 72;
+constexpr uint16_t kTodayAllDayCardHeight = 48;
 constexpr uint8_t kCardRadius = 10;
 constexpr uint16_t kFooterHeight = 32;
 constexpr uint16_t kFooterTop = kDisplayHeight - kFooterHeight;
@@ -123,21 +124,25 @@ void drawCurrentWeather(DisplayTarget &display, const WeatherData &weather) {
 }
 
 void drawTodayCard(DisplayTarget &display, uint16_t y, const CalendarEvent &event, int64_t dayStart) {
+  const uint16_t height = event.allDay ? kTodayAllDayCardHeight : kTodayCardHeight;
   const DisplayColor background = event.allDay ? CalendarPatterns::Sidebar : CalendarColors::Background;
-  display.roundRect(kOuterPadding, y, kMainContentWidth, kTodayCardHeight, kCardRadius,
+  display.roundRect(kOuterPadding, y, kMainContentWidth, height, kCardRadius,
                     background, CalendarColors::Border);
-  display.line(122, y + 12, 122, y + kTodayCardHeight - 12);
+  display.line(122, event.allDay ? y : y + 12, 122, event.allDay ? y + height - 1 : y + height - 12);
   char time[12];
   char title[kEventTitleLength];
   char detail[30];
   formatEventTime(event, dayStart, time, sizeof(time));
   fitText(display, event.title, title, sizeof(title), kCalendarFontTitle, kTodayTextWidth);
   fitText(display, secondaryText(event), detail, sizeof(detail), kCalendarFontFooter, kTodayTextWidth);
-  display.text(29, static_cast<uint16_t>(y + (kTodayCardHeight + display.fontHeight(kCalendarFontMetadata)) / 2),
+  display.text(29, static_cast<uint16_t>(y + (height + display.fontHeight(kCalendarFontMetadata)) / 2),
                time, kCalendarFontMetadata, CalendarColors::Foreground, background);
-  display.text(kTodayTextX, baselineFromTop(display, y + 17, kCalendarFontTitle), title, kCalendarFontTitle,
+  const uint16_t titleBaseline = event.allDay
+      ? static_cast<uint16_t>(y + (height + display.fontHeight(kCalendarFontTitle)) / 2)
+      : baselineFromTop(display, y + 17, kCalendarFontTitle);
+  display.text(kTodayTextX, titleBaseline, title, kCalendarFontTitle,
                CalendarColors::Foreground, background);
-  if (detail[0] != '\0') {
+  if (!event.allDay && detail[0] != '\0') {
     display.text(kTodayTextX, baselineFromTop(display, y + 43, kCalendarFontFooter), detail, kCalendarFontFooter,
                  CalendarColors::Foreground, background);
   }
@@ -158,7 +163,7 @@ size_t drawToday(DisplayTarget &display, const CalendarEvent *events, size_t cou
   uint16_t y = 128;
   for (size_t i = 0; i < visibleCount; ++i) {
     drawTodayCard(display, y, today[i], range.startEpoch);
-    y = static_cast<uint16_t>(y + kTodayCardHeight + kCardGap);
+    y = static_cast<uint16_t>(y + (today[i].allDay ? kTodayAllDayCardHeight : kTodayCardHeight) + kCardGap);
   }
   return todayCount;
 }
