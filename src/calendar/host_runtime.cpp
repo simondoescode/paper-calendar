@@ -710,7 +710,8 @@ namespace calendar {
         "<label>Refresh interval (seconds)</label><input name=refresh_interval type=number min=60 max=604800 value=\"" +
         interval + "\" required><label>Timezone</label><input name=timezone value=\"" + escapeHtml(settings.timezone) +
         "\" required><h2>Weather location</h2><label>Latitude</label>"
-        "<input name=weather_latitude type=number min=-90 max=90 step=any value=\"" + std::string(latitude) +
+        "<input name=weather_latitude type=number min=-90 max=90 step=any value=\"" +
+        std::string(latitude) +
         "\" required><label>Longitude</label>"
         "<input name=weather_longitude type=number min=-180 max=180 step=any value=\"" +
         std::string(longitude) +
