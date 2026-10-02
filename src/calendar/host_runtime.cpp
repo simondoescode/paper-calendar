@@ -9,6 +9,7 @@
 #include <calendar/calendar_renderer.h>
 #include <calendar/icalendar_parser.h>
 #include <calendar/mock_calendar_provider.h>
+#include <calendar/weather_client.h>
 #include <chrono>
 #include <errno.h>
 #include <fonts/Manrope_Bold_13.h>
@@ -32,9 +33,9 @@
 #include <vector>
 
 #if defined(_WIN32)
+#include <winsock2.h>
 #include <windows.h>
 #include <winhttp.h>
-#include <winsock2.h>
 #include <ws2tcpip.h>
 using HostSocket = SOCKET;
 static const HostSocket kInvalidSocket = INVALID_SOCKET;
@@ -239,18 +240,20 @@ namespace calendar {
     }
 
     struct FeedSink {
-      explicit FeedSink(std::string &value) : data(value) {}
+      explicit FeedSink(std::string &value, size_t limit) : data(value), limit(limit) {}
       std::string &data;
+      size_t limit;
       bool write(const uint8_t *data, size_t length) {
-        if (length > 2 * 1024 * 1024 - this->data.size()) return false;
+        if (this->data.size() > limit || length > limit - this->data.size()) return false;
         this->data.append(reinterpret_cast<const char *>(data), length);
         return true;
       }
     };
 
 // Host-only transport. Never include the private URL in diagnostics.
-    bool fetchHostFeed(const char *url, std::string &data, char *error, size_t errorSize) {
-      FeedSink sink{data};
+    bool fetchHostFeed(const char *url, std::string &data, char *error, size_t errorSize,
+                       size_t limit = 2 * 1024 * 1024, uint32_t timeoutMs = kCalendarFeedTimeoutMs) {
+      FeedSink sink{data, limit};
       snprintf(error, errorSize, "HTTPS connection failed.");
 #if defined(_WIN32)
       struct Handle {
@@ -272,8 +275,7 @@ namespace calendar {
       path.append(parts.lpszExtraInfo, parts.dwExtraInfoLength);
       Handle session{WinHttpOpen(L"CalendarHost/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME,
                                  WINHTTP_NO_PROXY_BYPASS, 0)};
-      if (!session.value || !WinHttpSetTimeouts(session.value, kCalendarFeedTimeoutMs, kCalendarFeedTimeoutMs,
-                                                kCalendarFeedTimeoutMs, kCalendarFeedTimeoutMs))
+      if (!session.value || !WinHttpSetTimeouts(session.value, timeoutMs, timeoutMs, timeoutMs, timeoutMs))
         return false;
       Handle connection{WinHttpConnect(session.value, host.c_str(), parts.nPort, 0)};
       if (!connection.value) return false;
@@ -296,7 +298,7 @@ namespace calendar {
       uint8_t chunk[512];
       for (;;) {
         DWORD count = 0;
-        if (std::chrono::steady_clock::now() - started >= std::chrono::milliseconds(kCalendarFeedTimeoutMs) ||
+        if (std::chrono::steady_clock::now() - started >= std::chrono::milliseconds(timeoutMs) ||
             !WinHttpReadData(request.value, chunk, sizeof(chunk), &count))
           return false;
         if (count == 0) return true;
@@ -313,7 +315,7 @@ namespace calendar {
       curl_easy_setopt(request, CURLOPT_URL, url);
       curl_easy_setopt(request, CURLOPT_FOLLOWLOCATION, 0L);
       curl_easy_setopt(request, CURLOPT_NOSIGNAL, 1L);
-      curl_easy_setopt(request, CURLOPT_TIMEOUT_MS, static_cast<long>(kCalendarFeedTimeoutMs));
+      curl_easy_setopt(request, CURLOPT_TIMEOUT_MS, static_cast<long>(timeoutMs));
       curl_easy_setopt(
         request, CURLOPT_WRITEFUNCTION, +[](char *data, size_t size, size_t count, void *context) -> size_t {
           const size_t length = size * count;
@@ -373,6 +375,19 @@ namespace calendar {
     }
 
   } // namespace
+
+  bool fetchHostWeather(WeatherData &output, double latitude, double longitude) {
+    char url[768], error[160];
+    if (!buildWeatherUrl(url, sizeof(url), latitude, longitude)) return false;
+    std::string json;
+    if (!fetchHostFeed(url, json, error, sizeof(error), kMaximumWeatherResponseBytes, kWeatherTimeoutMs) ||
+        !parseWeatherResponse(json.c_str(), json.size(), output, static_cast<uint32_t>(time(nullptr)))) {
+      fprintf(stderr, "[weather] Live request failed; retaining the last forecast for this location.\n");
+      return false;
+    }
+    printf("[weather] Live forecast updated.\n");
+    return true;
+  }
 
   HostCalendarProvider::HostCalendarProvider(const CalendarSettings &settings, CalendarDate today)
       : _settings(settings), _today(today), _error{} {}
@@ -702,8 +717,8 @@ namespace calendar {
         std::string(latitude) + "\" required><label>Longitude</label>"
         "<input name=weather_longitude type=number min=-180 max=180 step=any value=\"" +
         std::string(longitude) +
-        "\" required><p>Enter decimal coordinates. The host preview uses offline demo weather; "
-        "these settings do not change its forecast or the physical device.</p>"
+        "\" required><p>Enter decimal coordinates for live Open-Meteo weather. "
+        "These settings apply to this host preview and do not change the physical device.</p>"
         "<button>Save settings</button></form><button id=refresh>Refresh now</button>"
         "<button id=reload>Reload settings and render</button><p id=status></p><h2>800 × 480 preview</h2>"
         "<img id=preview src='/preview.png' alt='Calendar display preview'>"

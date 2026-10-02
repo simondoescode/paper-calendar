@@ -264,8 +264,10 @@ in your browser to access the local setup portal. Settings and the display previ
 are written to `.dev/calendar-settings.json` and `.dev/calendar-preview.png`.
 
 The portal includes weather latitude and longitude fields in decimal degrees.
-These are saved locally; the host preview still uses offline demo weather and
-does not transfer settings to the device.
+These are saved locally and used to fetch live Open-Meteo weather when the emulator
+starts, settings are saved, or you refresh. Settings are not transferred to the device.
+If a request fails, the host retains the last successful forecast for that location
+until it exits. Without a successful forecast, it shows weather as unavailable.
 
 Press **Ctrl+C** in the emulator terminal to stop it before rebuilding. On Windows,
 a running emulator locks `program.exe` and causes an `Access is denied` build error.

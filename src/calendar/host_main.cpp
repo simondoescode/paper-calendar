@@ -3,14 +3,10 @@
 #include <calendar/calendar_renderer.h>
 #include <calendar/host_runtime.h>
 #include <calendar/settings.h>
-#include <calendar/weather_client.h>
-#include <fstream>
-#include <iterator>
 #include <memory>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <string>
 #include <time.h>
 
 namespace {
@@ -62,17 +58,15 @@ namespace {
     }
     printf("Refresh complete: %u events; next configured interval %lu seconds.\n", static_cast<unsigned>(count),
            static_cast<unsigned long>(settings.refreshIntervalSeconds));
-    calendar::WeatherData weather = {};
-    std::ifstream fixture("test/fixtures/open_meteo.json");
-    const std::string json((std::istreambuf_iterator<char>(fixture)), std::istreambuf_iterator<char>());
-    if (calendar::parseWeatherResponse(json.c_str(), json.size(), weather, 0)) {
-      for (size_t i = 0; i < calendar::kWeatherForecastDays; ++i) {
-        const auto date = calendar::calendarDateAddDays(today, i);
-        snprintf(weather.forecast[i].date, sizeof(weather.forecast[i].date), "%04d-%02u-%02u", date.year, date.month,
-                 date.day);
-      }
-      printf("[weather] Offline demo fixture (not live weather).\n");
+    static calendar::WeatherData weather = {};
+    static double weatherLatitude = settings.weatherLatitude;
+    static double weatherLongitude = settings.weatherLongitude;
+    if (weatherLatitude != settings.weatherLatitude || weatherLongitude != settings.weatherLongitude) {
+      weather = {};
+      weatherLatitude = settings.weatherLatitude;
+      weatherLongitude = settings.weatherLongitude;
     }
+    calendar::fetchHostWeather(weather, weatherLatitude, weatherLongitude);
     calendar::FooterStatus footer;
     footer.wifiLabel = "Home WiFi";
     footer.wifiConnected = true;

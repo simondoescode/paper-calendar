@@ -3,9 +3,12 @@
 #include <calendar/calendar.h>
 #include <calendar/display_target.h>
 #include <calendar/settings.h>
+#include <calendar/weather.h>
 #include <functional>
 
 namespace calendar {
+
+  bool fetchHostWeather(WeatherData &output, double latitude, double longitude);
 
   class HostCalendarProvider : public CalendarProvider {
   public:

@@ -499,9 +499,13 @@ WMO mapping is centralized in `weatherConditionFromWmoCode()`:
 | 95, 96, 99 | Thunderstorm / cloud-lightning |
 | Other | Unknown / cloud fallback |
 
-The host preview reads the deterministic `test/fixtures/open_meteo.json`
-fixture using the production parser, with forecast dates moved relative to
-the host date. It logs that this is demo weather and makes no live request.
+The host preview fetches live Open-Meteo weather using the coordinates saved
+in its local portal, at startup and on save, refresh, or reload. It uses the
+existing host HTTPS adapter with a 4096-byte response limit and 10-second
+transport timeouts, plus the production weather parser. Failed requests retain
+the last successful forecast in memory for the same location; changing coordinates
+or restarting clears that cache. Without a successful forecast it shows weather
+as unavailable. The deterministic `test/fixtures/open_meteo.json` remains for tests.
 Offline tests cover all code mappings, day/night icons, parsing, invalid
 responses preserving cached data, weather hashes and one refresh per render.
 
