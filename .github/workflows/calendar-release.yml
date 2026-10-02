@@ -1,0 +1,115 @@
+name: calendar-release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing version tag to publish, e.g. v1.8.17"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: calendar-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Resolve tag
+        id: version
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag must use vMAJOR.MINOR.PATCH"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.version.outputs.tag }}
+
+      - name: Verify tag matches firmware version
+        shell: bash
+        run: |
+          MAJOR=$(awk '/#define FW_MAJOR_VERSION/ {print $3}' include/config.h)
+          MINOR=$(awk '/#define FW_MINOR_VERSION/ {print $3}' include/config.h)
+          PATCH=$(awk '/#define FW_PATCH_VERSION/ {print $3}' include/config.h)
+          EXPECTED="${MAJOR}.${MINOR}.${PATCH}"
+          if [[ "${{ steps.version.outputs.version }}" != "$EXPECTED" ]]; then
+            echo "::error::Tag ${{ steps.version.outputs.tag }} does not match include/config.h (v${EXPECTED})"
+            exit 1
+          fi
+
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+          key: ${{ runner.os }}-calendar-pio-${{ hashFiles('platformio.ini') }}
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install PlatformIO
+        run: pip install --upgrade platformio==6.1.19
+
+      - name: Build Paper Calendar firmware
+        env:
+          INCLUDE_GIT_HASH_IN_VERSION_NUMBER: "false"
+        run: python scripts/platformio_cli.py run -e TRMNL_7inch5_OG_DIY_Kit
+
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          cp .pio/build/TRMNL_7inch5_OG_DIY_Kit/firmware.bin paper-calendar.bin
+          SIZE=$(stat -c%s paper-calendar.bin)
+          SHA256=$(sha256sum paper-calendar.bin | awk '{print $1}')
+          TAG="${{ steps.version.outputs.tag }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/paper-calendar.bin"
+
+          jq -n \
+            --arg version "$VERSION" \
+            --arg url "$URL" \
+            --arg sha256 "$SHA256" \
+            --argjson size "$SIZE" \
+            '{version:$version,url:$url,sha256:$sha256,size:$size}' > manifest.json
+
+          {
+            echo "## Paper Calendar ${TAG}"
+            echo
+            echo "- firmware: ${SIZE} bytes"
+            echo "- sha256: \`${SHA256}\`"
+            echo "- OTA target: \`TRMNL_7inch5_OG_DIY_Kit\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        shell: bash
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" paper-calendar.bin manifest.json --clobber
+          else
+            gh release create "$TAG" paper-calendar.bin manifest.json \
+              --title "Paper Calendar $TAG" \
+              --generate-notes
+          fi
