@@ -281,9 +281,13 @@ void calendar_app_setup() {
   const float batteryVoltage = display_battery_voltage();
   const int16_t batteryTenthsVolts =
     batteryVoltage >= 0.0f ? static_cast<int16_t>(lroundf(batteryVoltage * 10.0f)) : -1;
-  calendar::WeatherData weather = {};
-  calendar::loadWeatherCache(weather, WEATHER_LATITUDE, WEATHER_LONGITUDE);
   calendar::WifiManager wifiManager;
+  double weatherLatitude = WEATHER_LATITUDE;
+  double weatherLongitude = WEATHER_LONGITUDE;
+  wifiManager.getWeatherLocation(weatherLatitude, weatherLongitude);
+  Serial.printf("Weather location: %.6f, %.6f\n", weatherLatitude, weatherLongitude);
+  calendar::WeatherData weather = {};
+  calendar::loadWeatherCache(weather, weatherLatitude, weatherLongitude);
   bool connected = false;
 
   if (wifiManager.hasSavedCredentials()) {
@@ -386,7 +390,7 @@ void calendar_app_setup() {
     return;
   }
   Serial.printf("Loaded %u visible iCalendar events\n", static_cast<unsigned>(eventCount));
-  calendar::fetchWeather(weather, WEATHER_LATITUDE, WEATHER_LONGITUDE);
+  calendar::fetchWeather(weather, weatherLatitude, weatherLongitude);
   calendar::FooterStatus footer;
   footer.wifiLabel = "Home WiFi"; // Generic label; do not expose stored credentials.
   footer.wifiConnected = wifiManager.isConnected();
