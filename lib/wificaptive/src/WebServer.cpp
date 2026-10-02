@@ -7,6 +7,10 @@
 
 #include "WifiCaptive.h"
 
+#ifdef EINK_CALENDAR_APP
+#include <calendar/calendar_config.h>
+#endif
+
 namespace {
   bool isCalendarFeedUrlValid(String url) {
     url.trim();
