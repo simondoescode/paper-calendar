@@ -68,6 +68,16 @@ pip install platformio
 
 The repository includes wrapper scripts that can locate PlatformIO even when it is not globally available.
 
+Run all commands below from the repository root. In Windows PowerShell, if you see
+`pio : The term 'pio' is not recognized`, use `.\scripts\pio.cmd` in place of
+`pio` for any command below. No global PATH change is required. For example:
+
+```powershell
+.\scripts\pio.cmd --version
+.\scripts\pio.cmd run -e TRMNL_7inch5_OG_DIY_Kit
+.\scripts\pio.cmd run -e TRMNL_7inch5_OG_DIY_Kit -t upload
+```
+
 ### 2. Build the firmware
 
 The Paper Calendar target is the default environment:
