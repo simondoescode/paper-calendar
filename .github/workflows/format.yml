@@ -13,10 +13,43 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
-
-      # Verifies formatting only; does not modify code. clang-format honors the
-      # repo's .clang-format and .clang-format-ignore. Run scripts/format.sh to fix.
-      - name: Check formatting
-        uses: jidicula/clang-format-action@v4.18.0
         with:
-          clang-format-version: "22"
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install clang-format
+        run: pip install clang-format==22.1.0
+
+      - name: Check formatting of changed C/C++ files
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            RANGE="origin/$BASE_REF...HEAD"
+            git fetch origin "$BASE_REF"
+            mapfile -t FILES < <(git diff --name-only --diff-filter=ACMR "$RANGE" |
+              grep -E '\.(c|cc|cpp|cxx|h|hh|hpp|hxx|ino)$' || true)
+          elif [[ "$EVENT_NAME" == "push" && -n "$BEFORE_SHA" &&
+                  "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ]]; then
+            mapfile -t FILES < <(git diff --name-only --diff-filter=ACMR "$BEFORE_SHA" HEAD |
+              grep -E '\.(c|cc|cpp|cxx|h|hh|hpp|hxx|ino)$' || true)
+          else
+            mapfile -t FILES < <(git ls-files |
+              grep -E '\.(c|cc|cpp|cxx|h|hh|hpp|hxx|ino)$' || true)
+          fi
+
+          if [[ ${#FILES[@]} -eq 0 ]]; then
+            echo "No changed C/C++ files to format-check."
+            exit 0
+          fi
+
+          printf 'Checking %s\n' "${FILES[@]}"
+          clang-format -style=file --dry-run --Werror "${FILES[@]}"
