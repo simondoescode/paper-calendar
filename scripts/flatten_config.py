@@ -10,6 +10,7 @@ import json
 import subprocess
 import sys
 import os
+from platformio_cli import platformio_command
 
 def flatten_config(data):
     """Flatten the PlatformIO config by sorting environments and their properties"""
@@ -42,8 +43,13 @@ def main():
     project_root = os.path.dirname(script_dir)
     
     # Run pio project config from project root
+    try:
+        command = platformio_command()
+    except RuntimeError as error:
+        print(str(error), file=sys.stderr)
+        return 1
     result = subprocess.run(
-        ['pio', 'project', 'config', '--json-output'],
+        command + ['project', 'config', '--json-output'],
         cwd=project_root,
         capture_output=True,
         text=True
@@ -61,4 +67,4 @@ def main():
     print(json.dumps(flattened, indent=2, sort_keys=True))
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

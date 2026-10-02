@@ -2,6 +2,10 @@ Import("env")
 import subprocess
 import urllib.request
 from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(env.subst("$PROJECT_DIR")) / "scripts"))
+from platformio_cli import platformio_command
 
 LITTLEFS_URL = "https://trmnl-fw.s3.us-east-2.amazonaws.com/littlefs.bin"
 LITTLEFS_OFFSET = "0x620000"
@@ -26,8 +30,8 @@ def post_build(source, target, env):
     else:
         print(f"board_build.filesystem is '{filesystem}'; skipping littlefs.bin in merged image")
 
-    subprocess.run([
-        "pio", "pkg", "exec", "-p", "tool-esptoolpy", "esptool.py", "--",
+    subprocess.run(platformio_command(env.subst("$PROJECT_CORE_DIR")) + [
+        "pkg", "exec", "-p", "tool-esptoolpy", "esptool.py", "--",
         "--chip", "ESP32S3",
         "merge_bin",
         "-o", str(output),

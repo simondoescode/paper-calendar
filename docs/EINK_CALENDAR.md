@@ -230,26 +230,26 @@ refresh per render.
 Build from the repository root:
 
 ```powershell
-pio run -e TRMNL_7inch5_OG_DIY_Kit
+python scripts/platformio_cli.py run -e TRMNL_7inch5_OG_DIY_Kit
 ```
 
 With the board connected and in its normal ESP32-S3 download mode, flash with:
 
 ```powershell
-pio run -e TRMNL_7inch5_OG_DIY_Kit -t upload
+python scripts/platformio_cli.py run -e TRMNL_7inch5_OG_DIY_Kit -t upload
 ```
 
 If PlatformIO cannot select the correct serial port, list ports with
-`pio device list` and pass one explicitly:
+`python scripts/platformio_cli.py device list` and pass one explicitly:
 
 ```powershell
-pio run -e TRMNL_7inch5_OG_DIY_Kit -t upload --upload-port COM3
+python scripts/platformio_cli.py run -e TRMNL_7inch5_OG_DIY_Kit -t upload --upload-port COM3
 ```
 
 Open serial diagnostics at 115200 baud:
 
 ```powershell
-pio device monitor -e TRMNL_7inch5_OG_DIY_Kit
+python scripts/platformio_cli.py device monitor -e TRMNL_7inch5_OG_DIY_Kit
 ```
 
 The board target, panel profile, and SPI pins are defined upstream in
@@ -267,7 +267,7 @@ server provides a settings page and lifecycle controls.
 Build and run from the repository root:
 
 ```sh
-pio run -e calendar-host
+python scripts/platformio_cli.py run -e calendar-host
 ```
 
 The native environment requires a C++ compiler on `PATH`: MinGW-w64 (`g++`)
@@ -275,7 +275,7 @@ on Windows, GCC/build-essential on Linux, or Xcode Command Line Tools on
 macOS. Run the deterministic host tests with:
 
 ```sh
-pio test -e native_calendar
+python scripts/platformio_cli.py test -e native_calendar
 ```
 
 PlatformIO writes the executable under `.pio/build/calendar-host/`. On Windows
@@ -589,3 +589,8 @@ for the ESP32 and Wi-Fi to remain off between updates.
 3. **Calendar UI/data:** keep improving event aggregation, all-day and
    multi-day behavior, layout, and source labels without coupling the renderer
    to iCalendar syntax.
+
+PlatformIO commands use the shared repository resolver. If Python is not on
+PATH, replace `python scripts/platformio_cli.py` with `.\scripts\pio.cmd`
+on Windows, or `bash scripts/pio.sh` on Linux/macOS. These launchers use the
+normal PlatformIO virtualenv without requiring a global PATH edit.

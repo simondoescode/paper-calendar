@@ -62,26 +62,26 @@ jobs:
 
       - name: Display PlatformIO Information
         run: |
-          pio system info
+          python scripts/platformio_cli.py system info
           g++ --version
           gcc --version
 
       - name: build (trmnl)
-        run: pio run -j ${{ runner.os == 'Windows' && '1' || '4' }} -v
+        run: python scripts/platformio_cli.py run -j ${{ runner.os == 'Windows' && '1' || '4' }} -v
 
       #- name: build (TRMNL_X)
-      #  run: pio run -e TRMNL_X -j ${{ runner.os == 'Windows' && '1' || '4' }} -v
+      #  run: python scripts/platformio_cli.py run -e TRMNL_X -j ${{ runner.os == 'Windows' && '1' || '4' }} -v
 
       - name: test
         if: matrix.os != 'windows-latest'
-        run: pio test -e native -v
+        run: python scripts/platformio_cli.py test -e native -v
 
       - name: test (windows)
         if: matrix.os == 'windows-latest'
-        run: pio test -e native-windows -v
+        run: python scripts/platformio_cli.py test -e native-windows -v
 
       - name: static analysis
-        run: pio check --skip-packages --fail-on-defect high
+        run: python scripts/platformio_cli.py check --skip-packages --fail-on-defect high
 
   publish-engineering-build:
     needs: build-test

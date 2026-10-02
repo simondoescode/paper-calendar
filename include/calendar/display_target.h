@@ -7,7 +7,7 @@ namespace calendar {
 enum class DisplayColor : uint8_t {
   Black = 0,
   White = 1,
-  // Pattern token, never a hardware grey level. Only fillRect and text
+  // Pattern token, never a hardware grey level. Only rectangle fills and text
   // backgrounds support it on the embedded adapter.
   DitherLightGrey = 2,
 };

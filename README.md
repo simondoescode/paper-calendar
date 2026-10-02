@@ -253,25 +253,25 @@ There are technical and non-technical options to flashing firmware.
 
 
 ### **Via CLI**
-1. To build the binary run `pio run -e TRMNL_X_dev`
-2. To upload the binary to the device `pio run -e TRMNL_X_dev -t upload`
+1. To build the binary run `python scripts/platformio_cli.py run -e TRMNL_X_dev`
+2. To upload the binary to the device `python scripts/platformio_cli.py run -e TRMNL_X_dev -t upload`
 3. If PlatformIO uses the wrong port use this
 ```bash
-pio device list # make sure JTAG device is visible
-pio run -e TRMNL_X_dev -t upload --upload-port /dev/cu.usbmodem1234
+python scripts/platformio_cli.py device list # make sure JTAG device is visible
+python scripts/platformio_cli.py run -e TRMNL_X_dev -t upload --upload-port /dev/cu.usbmodem1234
 ```
 4. view serial monitor by
 ```bash
-pio device monitor -e TRMNL_X_dev
-pio device monitor -e trmnl
+python scripts/platformio_cli.py device monitor -e TRMNL_X_dev
+python scripts/platformio_cli.py device monitor -e trmnl
 ```
 
-When switching between TRMNL X and OG/BWRY, run `pio pkg install` once for the environment you are about to build (use the same `-e` value as `pio run`):
+When switching between TRMNL X and OG/BWRY, run `python scripts/platformio_cli.py pkg install` once for the environment you are about to build (use the same `-e` value as `python scripts/platformio_cli.py run`):
 
 ```bash
-pio pkg install -e TRMNL_X_dev   # TRMNL X
-pio pkg install -e trmnl         # TRMNL OG
-pio pkg install -e trmnl_4clr    # TRMNL BWRY
+python scripts/platformio_cli.py pkg install -e TRMNL_X_dev   # TRMNL X
+python scripts/platformio_cli.py pkg install -e trmnl         # TRMNL OG
+python scripts/platformio_cli.py pkg install -e trmnl_4clr    # TRMNL BWRY
 ```
 
 If you skip this step, the build may fail with `Error: Missing Arduino framework directory 'None'`.
@@ -425,3 +425,19 @@ Two ways to format files:
 
 1. Run `./scripts/format.sh` to format the entire repository.
 2. VS Code users: install [the C/C++ extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools) which will automatically format-on-save using clang-format.
+### PlatformIO command discovery
+
+Use `scripts\pio.cmd run -e TRMNL_7inch5_OG_DIY_Kit` on Windows
+(PowerShell: `.\scripts\pio.cmd run -e TRMNL_7inch5_OG_DIY_Kit`), or
+`bash scripts/pio.sh run -e TRMNL_7inch5_OG_DIY_Kit` on Linux/macOS.
+These launchers locate Python in the PlatformIO virtualenv; a global Python or
+PlatformIO PATH entry is unnecessary. Where Python is already available,
+`python scripts/platformio_cli.py` accepts the same arguments.
+
+All repository build, packaging, and flashing scripts share
+`scripts/platformio_cli.py`: it tries `pio`, then `platformio` on PATH, then
+the build's core directory, the running Python environment,
+`PLATFORMIO_CORE_DIR`, `VIRTUAL_ENV`, repository `.venv`/`venv`, and the normal
+`~/.platformio/penv` installation. An installed Python module is the final
+fallback. Set `PLATFORMIO_CORE_DIR` for a custom core installation.
+Paths containing spaces are passed as individual arguments.

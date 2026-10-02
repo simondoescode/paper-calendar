@@ -39,7 +39,7 @@ jobs:
       - name: Build dev firmware (${{ matrix.env }})
         env:
           INCLUDE_GIT_HASH_IN_VERSION_NUMBER: "true"
-        run: pio run -e ${{ matrix.env }}
+        run: python scripts/platformio_cli.py run -e ${{ matrix.env }}
 
       - name: Derive version, commit and filenames
         run: |

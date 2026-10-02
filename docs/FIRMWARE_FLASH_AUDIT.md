@@ -260,8 +260,8 @@ previous build. Hardware/OTA flashing has not been performed.
 Run from the repository root after building:
 
 ```powershell
-pio run -e TRMNL_7inch5_OG_DIY_Kit
-pio run -e TRMNL_7inch5_OG_DIY_Kit -t size
+python scripts/platformio_cli.py run -e TRMNL_7inch5_OG_DIY_Kit
+python scripts/platformio_cli.py run -e TRMNL_7inch5_OG_DIY_Kit -t size
 python tools/audit_firmware_size.py --toolchain C:/Users/simon/.platformio/packages/toolchain-xtensa-esp32s3/bin --output .dev/flash-audit.json
 ```
 

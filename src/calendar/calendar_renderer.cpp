@@ -123,8 +123,9 @@ void drawCurrentWeather(DisplayTarget &display, const WeatherData &weather) {
 }
 
 void drawTodayCard(DisplayTarget &display, uint16_t y, const CalendarEvent &event, int64_t dayStart) {
+  const DisplayColor background = event.allDay ? CalendarPatterns::Sidebar : CalendarColors::Background;
   display.roundRect(kOuterPadding, y, kMainContentWidth, kTodayCardHeight, kCardRadius,
-                    CalendarColors::Background, CalendarColors::Foreground);
+                    background, CalendarColors::Border);
   display.line(122, y + 12, 122, y + kTodayCardHeight - 12);
   char time[12];
   char title[kEventTitleLength];
@@ -133,10 +134,12 @@ void drawTodayCard(DisplayTarget &display, uint16_t y, const CalendarEvent &even
   fitText(display, event.title, title, sizeof(title), kCalendarFontTitle, kTodayTextWidth);
   fitText(display, secondaryText(event), detail, sizeof(detail), kCalendarFontFooter, kTodayTextWidth);
   display.text(29, static_cast<uint16_t>(y + (kTodayCardHeight + display.fontHeight(kCalendarFontMetadata)) / 2),
-               time, kCalendarFontMetadata);
-  display.text(kTodayTextX, baselineFromTop(display, y + 17, kCalendarFontTitle), title, kCalendarFontTitle);
+               time, kCalendarFontMetadata, CalendarColors::Foreground, background);
+  display.text(kTodayTextX, baselineFromTop(display, y + 17, kCalendarFontTitle), title, kCalendarFontTitle,
+               CalendarColors::Foreground, background);
   if (detail[0] != '\0') {
-    display.text(kTodayTextX, baselineFromTop(display, y + 43, kCalendarFontFooter), detail, kCalendarFontFooter);
+    display.text(kTodayTextX, baselineFromTop(display, y + 43, kCalendarFontFooter), detail, kCalendarFontFooter,
+                 CalendarColors::Foreground, background);
   }
 }
 
@@ -144,6 +147,7 @@ size_t drawToday(DisplayTarget &display, const CalendarEvent *events, size_t cou
   const CalendarRange range = calendarTodayRange(date);
   CalendarEvent today[kMaxEvents];
   const size_t todayCount = selectEventsForRange(events, count, range, today, kMaxEvents);
+  orderTodayEvents(today, todayCount);
   if (todayCount == 0) {
     display.roundRect(kOuterPadding, 136, kMainContentWidth, 100, kCardRadius,
                       CalendarColors::Background, CalendarColors::Foreground);

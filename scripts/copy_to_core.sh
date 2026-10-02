@@ -25,7 +25,7 @@ SRC=".pio/build/$DEVICE/merged_firmware.bin"
 CONFIG="include/config.h"
 
 if [ ! -f "$SRC" ]; then
-    echo "Error: $SRC not found. Run 'pio run -e $DEVICE' first."
+    echo "Error: $SRC not found. Run 'python scripts/platformio_cli.py run -e $DEVICE' first."
     exit 1
 fi
 

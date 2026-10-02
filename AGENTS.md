@@ -34,9 +34,9 @@ Run commands from the repository root. Prefer the narrowest relevant check;
 when changing shared calendar or device integration, run:
 
 ```sh
-pio test -e native_calendar -f test_calendar
-pio run -e calendar-host
-pio run -e TRMNL_7inch5_OG_DIY_Kit
+python scripts/platformio_cli.py test -e native_calendar -f test_calendar
+python scripts/platformio_cli.py run -e calendar-host
+python scripts/platformio_cli.py run -e TRMNL_7inch5_OG_DIY_Kit
 git diff --check
 ```
 
@@ -45,7 +45,7 @@ Windows). When a change touches common firmware or display code, also build a
 non-calendar target, for example:
 
 ```sh
-pio run -e trmnl
+python scripts/platformio_cli.py run -e trmnl
 ```
 
 Do not claim hardware validation unless firmware was actually flashed and
@@ -61,10 +61,15 @@ monochrome display. It is a development aid, not an ESP32 or NVS emulator.
 Run the executable from the repository root so its `.dev/` paths resolve:
 
 ```sh
-pio run -e calendar-host
+python scripts/platformio_cli.py run -e calendar-host
 ```
 
 Then run `.pio/build/calendar-host/program` (Linux/macOS) or
 `.pio/build/calendar-host/program.exe` (Windows). The local portal is at
 `http://localhost:8080`; settings and preview are written to
 `.dev/calendar-settings.json` and `.dev/calendar-preview.png`.
+
+PlatformIO commands use the shared repository resolver. If Python is not on
+PATH, replace `python scripts/platformio_cli.py` with `.\scripts\pio.cmd`
+on Windows, or `bash scripts/pio.sh` on Linux/macOS. These launchers use the
+normal PlatformIO virtualenv without requiring a global PATH edit.

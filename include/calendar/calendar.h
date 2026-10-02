@@ -63,6 +63,9 @@ CalendarRange calendarRestOfWeekRange(CalendarDate date);
 size_t selectEventsForRange(const CalendarEvent *events, size_t eventCount, CalendarRange range,
                             CalendarEvent *selected, size_t capacity);
 void formatEventTime(const CalendarEvent &event, int64_t dayStartEpoch, char *output, size_t outputSize);
+// Group all-day events first, preserving their existing civil-date/tie order.
+// Timed events retain the chronological order supplied by selectEventsForRange.
+void orderTodayEvents(CalendarEvent *events, size_t count);
 void truncateTitle(const char *title, char *output, size_t outputSize, size_t maxCharacters);
 uint32_t displayStateHash(DisplayStatus status, CalendarDate date, const CalendarEvent *events, size_t eventCount,
                           int16_t batteryTenthsVolts);

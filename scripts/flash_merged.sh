@@ -2,6 +2,8 @@
 
 set -e
 
+PIO=(bash "$(dirname -- "${BASH_SOURCE[0]}")/pio.sh")
+
 if [ $# -lt 1 ] || [ $# -gt 2 ]; then
     cat <<'EOF'
 Usage: scripts/flash_merged.sh <merged_firmware.bin> [chip]
@@ -25,7 +27,7 @@ fi
 FIRMWARE_FILE="$1"
 CHIP="${2:-auto}"
 BAUD_RATE=$((115200 * 4))
-ESPTOOL="pio pkg exec -p tool-esptoolpy esptool.py -- "
+ESPTOOL=("${PIO[@]}" pkg exec -p tool-esptoolpy esptool.py --)
 
 WRITE_OPTS=()
 EXTRA_OPTS=()
@@ -44,7 +46,7 @@ fi
 echo ""
 echo "⚡ Flashing firmware (chip: $CHIP, mode: $MODE_LABEL)..."
 
-if PYTHONIOENCODING=utf-8 $ESPTOOL --chip "$CHIP" --baud "$BAUD_RATE" "${EXTRA_OPTS[@]}" write_flash "${WRITE_OPTS[@]}" 0x0000 "$FIRMWARE_FILE"; then
+if PYTHONIOENCODING=utf-8 "${ESPTOOL[@]}" --chip "$CHIP" --baud "$BAUD_RATE" "${EXTRA_OPTS[@]}" write_flash "${WRITE_OPTS[@]}" 0x0000 "$FIRMWARE_FILE"; then
     echo ""
     echo "✅ Flash completed successfully!"
     echo "🔄 Device will reboot automatically"

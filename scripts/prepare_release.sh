@@ -2,6 +2,10 @@
 
 set -e
 
+PIO=(bash "$(dirname -- "${BASH_SOURCE[0]}")/pio.sh")
+
+PIO=(bash "$(dirname -- "${BASH_SOURCE[0]}")/pio.sh")
+
 TRMNL_ENVS=(
     trmnl
     trmnl_4clr
@@ -74,7 +78,7 @@ fi
 for env in "${ENVS[@]}"; do
     echo
     echo "=== Building $env ==="
-    pio run -e "$env"
+    "${PIO[@]}" run -e "$env"
 
     BUILD_DIR=".pio/build/$env"
     OTA_DIR=".pio/release/$env/ota"

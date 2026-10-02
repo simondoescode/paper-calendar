@@ -337,6 +337,17 @@ size_t selectEventsForRange(const CalendarEvent *events, size_t eventCount, Cale
   return selectedCount;
 }
 
+void orderTodayEvents(CalendarEvent *events, size_t count) {
+  if (events == nullptr) return;
+  size_t allDayCount = 0;
+  for (size_t i = 0; i < count; ++i) {
+    if (!events[i].allDay) continue;
+    const CalendarEvent event = events[i];
+    for (size_t j = i; j > allDayCount; --j) events[j] = events[j - 1];
+    events[allDayCount++] = event;
+  }
+}
+
 void formatEventTime(const CalendarEvent &event, int64_t dayStartEpoch, char *output, size_t outputSize) {
   if (output == nullptr || outputSize == 0) {
     return;

@@ -641,6 +641,81 @@ void test_host_provider_error_and_missing_configuration_are_clean(void) {
 }
 
 
+void test_today_groups_all_day_cards_and_preserves_text_backgrounds() {
+  class CheckedDisplay : public calendar::HostDisplayTarget {
+  public:
+    CheckedDisplay() : HostDisplayTarget("today-preview-test.png") {}
+    void roundRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint8_t r,
+                   calendar::DisplayColor fill, calendar::DisplayColor border) override {
+      if (x == 16 && h == 72) {
+        TEST_ASSERT_EQUAL_UINT(128 + fills.size() * 82, y);
+        TEST_ASSERT_EQUAL_UINT(calendar::CalendarColors::Border, border);
+        fills.push_back(fill);
+      }
+      HostDisplayTarget::roundRect(x, y, w, h, r, fill, border);
+    }
+    void text(uint16_t x, uint16_t y, const char *value, uint8_t font,
+              calendar::DisplayColor fg, calendar::DisplayColor bg) override {
+      if (x < 458 && y >= 128 && y < 448) {
+        TEST_ASSERT_EQUAL_UINT(calendar::CalendarColors::Foreground, fg);
+        TEST_ASSERT_EQUAL_UINT(fills.back(), bg);
+        if (x == 29) times.emplace_back(value);
+        if (x == 140 && font == calendar::kCalendarFontTitle) titles.emplace_back(value);
+      }
+      if (y >= 448 && strstr(value, "events today")) footer = value;
+      HostDisplayTarget::text(x, y, value, font, fg, bg);
+    }
+    std::vector<calendar::DisplayColor> fills;
+    std::vector<std::string> times, titles;
+    std::string footer;
+  } display;
+  const calendar::CalendarDate date = {2026, 10, 1};
+  const auto range = calendar::calendarTodayRange(date);
+  calendar::CalendarEvent events[] = {
+    eventAt("late", range.startEpoch + 3600, range.startEpoch + 7200),
+    eventAt("day-first", calendar::calendarEpoch(date), calendar::calendarEpoch({2026, 10, 2}), true),
+    eventAt("overnight", range.startEpoch - 3600, range.startEpoch + 1800),
+    eventAt("day-second", calendar::calendarEpoch(date), calendar::calendarEpoch({2026, 10, 2}), true),
+    eventAt("multi-day", calendar::calendarEpoch({2026, 9, 30}), calendar::calendarEpoch({2026, 10, 2}), true),
+  };
+  calendar::CalendarEvent selected[5];
+  TEST_ASSERT_EQUAL_UINT(5, calendar::selectEventsForRange(events, 5, range, selected, 5));
+  calendar::orderTodayEvents(selected, 5);
+  const char *expected[] = {"multi-day", "day-first", "day-second", "overnight", "late"};
+  for (size_t i = 0; i < 5; ++i) {
+    TEST_ASSERT_EQUAL_STRING(expected[i], selected[i].id);
+    snprintf(events[i].title, sizeof(events[i].title), "%s", events[i].id);
+  }
+  TEST_ASSERT_TRUE(calendar::renderCalendar(display, events, 5, date, "test", "host", -1));
+  TEST_ASSERT_EQUAL_UINT(4, display.fills.size());
+  for (size_t i = 0; i < 4; ++i) {
+    TEST_ASSERT_EQUAL_STRING(expected[i], display.titles[i].c_str());
+    TEST_ASSERT_EQUAL_UINT(i < 3 ? calendar::CalendarPatterns::Sidebar : calendar::CalendarColors::Background,
+                           display.fills[i]);
+    if (i < 3) TEST_ASSERT_EQUAL_STRING("ALL DAY", display.times[i].c_str());
+  }
+  TEST_ASSERT_EQUAL_STRING("5 events today", display.footer.c_str());
+  // A single all-day card still precedes an overnight event and ordinary times.
+  events[1] = eventAt("noon", range.startEpoch + 12 * 3600, range.startEpoch + 13 * 3600);
+  events[3] = eventAt("morning", range.startEpoch + 9 * 3600, range.startEpoch + 10 * 3600);
+  for (auto &event : events) snprintf(event.title, sizeof(event.title), "%s", event.id);
+  display.fills.clear();
+  display.times.clear();
+  display.titles.clear();
+  TEST_ASSERT_TRUE(calendar::renderCalendar(display, events, 5, date, "test", "host", -1));
+  const char *singleDayExpected[] = {"multi-day", "overnight", "late", "morning"};
+  for (size_t i = 0; i < 4; ++i) {
+    TEST_ASSERT_EQUAL_STRING(singleDayExpected[i], display.titles[i].c_str());
+    TEST_ASSERT_EQUAL_UINT(i == 0 ? calendar::CalendarPatterns::Sidebar : calendar::CalendarColors::Background,
+                           display.fills[i]);
+  }
+  TEST_ASSERT_EQUAL_STRING("ALL DAY", display.times[0].c_str());
+  TEST_ASSERT_EQUAL_STRING("01:00", display.times[2].c_str());
+  TEST_ASSERT_EQUAL_STRING("09:00", display.times[3].c_str());
+  TEST_ASSERT_EQUAL_STRING("5 events today", display.footer.c_str());
+  remove("today-preview-test.png");
+}
+
 void test_footer_fits_long_labels_and_keeps_cards_above_status_bar() {
   class CheckedDisplay : public calendar::HostDisplayTarget {
   public:
@@ -717,6 +792,7 @@ int main(int argc, char **argv) {
   (void)argv;
   UNITY_BEGIN();
   RUN_TEST(test_range_selection_sorts_events_by_start);
+  RUN_TEST(test_today_groups_all_day_cards_and_preserves_text_backgrounds);
   RUN_TEST(test_range_selection_keeps_earliest_events_when_capacity_is_limited);
   RUN_TEST(test_today_range_includes_overlapping_events);
   RUN_TEST(test_rest_of_week_excludes_today_and_ends_at_next_monday);

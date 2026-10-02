@@ -827,7 +827,25 @@ void display_calendar_round_rect(uint16_t x, uint16_t y, uint16_t width, uint16_
                                  uint8_t fill, uint8_t border)
 {
 #ifdef BB_EPAPER
-    bbep.fillRoundRect(x, y, width, height, radius, fill);
+    if (fill == calendar::CalendarPatterns::kSidebarToken) {
+        bbep.fillRoundRect(x, y, width, height, radius, BBEP_WHITE);
+        // Clip the shared sidebar halftone to the rounded shape, then redraw
+        // the driver's border. No extra framebuffer or native grey mode.
+        for (int py = y; py < static_cast<int>(y + height); ++py) {
+            const int nearestY = py < y + radius ? y + radius :
+                (py >= y + height - radius ? y + height - radius - 1 : py);
+            for (int px = x; px < static_cast<int>(x + width); ++px) {
+                const int nearestX = px < x + radius ? x + radius :
+                    (px >= x + width - radius ? x + width - radius - 1 : px);
+                const int dx = px - nearestX;
+                const int dy = py - nearestY;
+                if (dx * dx + dy * dy <= radius * radius && calendar::CalendarPatterns::sidebarInk(px, py))
+                    bbep.drawPixel(px, py, BBEP_BLACK);
+            }
+        }
+    } else {
+        bbep.fillRoundRect(x, y, width, height, radius, fill);
+    }
     bbep.drawRoundRect(x, y, width, height, radius, border);
 #else
     (void)x; (void)y; (void)width; (void)height; (void)radius; (void)fill; (void)border;
