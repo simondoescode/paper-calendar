@@ -14,6 +14,7 @@ namespace calendar {
     void disconnect();
     void getProvisioningSsid(char *output, size_t outputSize) const;
     bool getCalendarFeedUrl(char *output, size_t outputSize) const;
+    void getWeatherLocation(double &latitude, double &longitude) const;
   };
 
 } // namespace calendar
