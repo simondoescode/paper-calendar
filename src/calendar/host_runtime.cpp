@@ -32,9 +32,9 @@
 #include <vector>
 
 #if defined(_WIN32)
+#include <winsock2.h>
 #include <windows.h>
 #include <winhttp.h>
-#include <winsock2.h>
 #include <ws2tcpip.h>
 using HostSocket = SOCKET;
 static const HostSocket kInvalidSocket = INVALID_SOCKET;
