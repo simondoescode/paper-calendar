@@ -863,6 +863,21 @@
       var ntp = document.getElementById('ntpServer1').value.trim();
       if (ntp) body.ntpServer1 = ntp;
 
+      if (calendarMode) {
+        var latitudeText = document.getElementById('weatherLatitude').value.trim();
+        var longitudeText = document.getElementById('weatherLongitude').value.trim();
+        var latitude = Number(latitudeText);
+        var longitude = Number(longitudeText);
+        if (!latitudeText || !longitudeText || !Number.isFinite(latitude) || !Number.isFinite(longitude) ||
+            latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+          location.hash = '#advanced';
+          displayAdvancedAlert('Enter valid weather coordinates: latitude -90 to 90 and longitude -180 to 180.');
+          return;
+        }
+        body.weatherLatitude = latitude;
+        body.weatherLongitude = longitude;
+      }
+
       var btn = document.getElementById("btnConnect");
       btn.disabled = true;
       btn.textContent = "Connecting\u2026";
@@ -1118,6 +1133,13 @@
           'Paste Google Calendar’s private iCalendar address. Anyone with this URL can read the calendar.';
         document.getElementById('clearCalendarFeed').closest('.field').hidden =
           !settings.calendar_feed_configured;
+        document.getElementById('weather-location-section').hidden = false;
+        if (Number.isFinite(settings.weather_latitude)) {
+          document.getElementById('weatherLatitude').value = settings.weather_latitude;
+        }
+        if (Number.isFinite(settings.weather_longitude)) {
+          document.getElementById('weatherLongitude').value = settings.weather_longitude;
+        }
         if (clearCalendarFeed) {
           document.getElementById('server').value = '';
         }
@@ -1404,6 +1426,23 @@
             <input type="checkbox" id="clearCalendarFeed">
             Clear the saved private calendar feed URL
           </label>
+        </div>
+      </div>
+
+      <div class="adv-sec" id="weather-location-section" hidden>
+        <h3>Weather location</h3>
+        <div class="fields">
+          <div class="field">
+            <label for="weatherLatitude">Latitude</label>
+            <input class="inp" type="number" id="weatherLatitude" inputmode="decimal" step="any" min="-90" max="90"
+              placeholder="51.5074">
+          </div>
+          <div class="field">
+            <label for="weatherLongitude">Longitude</label>
+            <input class="inp" type="number" id="weatherLongitude" inputmode="decimal" step="any" min="-180" max="180"
+              placeholder="-0.1278">
+          </div>
+          <p class="hint">Used for the Open-Meteo forecast. Enter coordinates for the location this calendar should show.</p>
         </div>
       </div>
 
