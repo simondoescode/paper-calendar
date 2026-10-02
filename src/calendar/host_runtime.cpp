@@ -56,7 +56,7 @@ namespace calendar {
 
     constexpr uint16_t kWidth = 800;
     constexpr uint16_t kHeight = 480;
-    constexpr size_t kRowBytes = (kWidth + 7) / 8;
+    constexpr size_t kRowBytes = (kWidth + 3) / 4;
 
     uint32_t crc32(const uint8_t *data, size_t length) {
       uint32_t crc = 0xffffffffu;
@@ -99,12 +99,11 @@ namespace calendar {
       scanlines.reserve(static_cast<size_t>(kHeight) * (kRowBytes + 1));
       for (uint16_t y = 0; y < kHeight; ++y) {
         scanlines.push_back(0);
-        for (uint16_t x = 0; x < kWidth; x += 8) {
+        for (uint16_t x = 0; x < kWidth; x += 4) {
           uint8_t packed = 0;
-          for (uint8_t bit = 0; bit < 8; ++bit) {
-            if (pixels[static_cast<size_t>(y) * kWidth + x + bit] != 0) {
-              packed |= static_cast<uint8_t>(0x80u >> bit);
-            }
+          for (uint8_t sample = 0; sample < 4; ++sample) {
+            const uint8_t gray = pixels[static_cast<size_t>(y) * kWidth + x + sample] & 0x03u;
+            packed |= static_cast<uint8_t>(gray << (6 - sample * 2));
           }
           scanlines.push_back(packed);
         }
@@ -131,7 +130,7 @@ namespace calendar {
       std::vector<uint8_t> header;
       appendBigEndian(header, kWidth);
       appendBigEndian(header, kHeight);
-      header.push_back(1);
+      header.push_back(2);
       header.push_back(0);
       header.push_back(0);
       header.push_back(0);
@@ -467,7 +466,7 @@ namespace calendar {
   const char *HostCalendarProvider::error() const { return _error; }
 
   struct HostDisplayTarget::Impl {
-    explicit Impl(const char *filePath) : path(filePath == nullptr ? "" : filePath), pixels(kWidth * kHeight, 1) {}
+    explicit Impl(const char *filePath) : path(filePath == nullptr ? "" : filePath), pixels(kWidth * kHeight, 3) {}
     std::string path;
     std::vector<uint8_t> pixels;
   };
@@ -477,16 +476,14 @@ namespace calendar {
 
   bool HostDisplayTarget::begin() {
     if (_impl == nullptr) return false;
-    std::fill(_impl->pixels.begin(), _impl->pixels.end(), 1);
+    std::fill(_impl->pixels.begin(), _impl->pixels.end(), static_cast<uint8_t>(DisplayColor::White));
     return true;
   }
 
   namespace {
     void setHostPixel(std::vector<uint8_t> &pixels, int x, int y, DisplayColor color) {
       if (x < 0 || x >= kWidth || y < 0 || y >= kHeight) return;
-      const bool black =
-        color == DisplayColor::Black || (color == CalendarPatterns::Sidebar && CalendarPatterns::sidebarInk(x, y));
-      pixels[static_cast<size_t>(y) * kWidth + x] = black ? 0 : 1;
+      pixels[static_cast<size_t>(y) * kWidth + x] = static_cast<uint8_t>(color);
     }
 
     const uint8_t *hostCalendarFont(uint8_t size) {
