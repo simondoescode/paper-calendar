@@ -52,7 +52,7 @@ namespace {
     bool begin() override { return display_calendar_begin(); }
     void text(uint16_t x, uint16_t y, const char *value, uint8_t size, calendar::DisplayColor foreground,
               calendar::DisplayColor background) override {
-      display_calendar_text(x, y, value, size, color(foreground), backgroundColor(background));
+      display_calendar_text(x, y, value, size, color(foreground), color(background));
     }
     uint16_t textWidth(const char *value, uint8_t size) override { return display_calendar_text_width(value, size); }
     uint8_t fontHeight(uint8_t size) override { return display_calendar_font_height(size); }
@@ -79,14 +79,7 @@ namespace {
     }
 
   private:
-    static uint8_t color(calendar::DisplayColor value) {
-      if (value == calendar::DisplayColor::White) return 1;
-      if (value == calendar::CalendarPatterns::Sidebar) return calendar::CalendarPatterns::kSidebarToken;
-      return 0;
-    }
-    static uint8_t backgroundColor(calendar::DisplayColor value) {
-      return value == calendar::CalendarPatterns::Sidebar ? 255 : color(value);
-    }
+    static uint8_t color(calendar::DisplayColor value) { return static_cast<uint8_t>(value); }
   };
 
   bool drawCalendar(const calendar::CalendarEvent *events, size_t count, calendar::CalendarDate date,
