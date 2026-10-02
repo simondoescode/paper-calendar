@@ -205,10 +205,30 @@ The default URL `fixture://default` selects the built-in deterministic
 contains all-day and timed events, multiple events on a day, a long title,
 events later in the week, and a day with no events. Tests use explicitly
 injected dates and never use live Google Calendar data. A local `.ics` fixture
-can also be selected using a `file://` URL. Host mode does not fetch remote
-HTTPS URLs; attempting one displays a provider error instead of crashing.
-This keeps the emulator useful offline and avoids introducing OAuth or a
-network dependency solely for development.
+can also be selected using a `file://` URL. Host mode fetches remote
+HTTPS URLs using the host's certificate trust store (WinHTTP on Windows,
+libcurl on Linux/macOS). Remote feeds use a non-redirecting GET, a 20-second
+timeout and a host-only 2 MiB download limit. A local Python adapter expands
+recurring events, exclusions and moved instances for the visible window,
+converts timed events to UTC and preserves all-day civil dates. It drops
+unused feed metadata before passing a maximum 48 KiB normalized feed and
+16 visible events to the shared parser and renderer. Expansion has a
+10-second timeout; sub-hourly recurrence is rejected. Failed feeds show a
+provider error without substituting fixture events. Linux/macOS host builds
+require libcurl development headers and libraries.
+
+Set up the host-only recurrence adapter once from the repository root:
+
+```powershell
+python -m venv .dev/calendar-tools
+.dev/calendar-tools/Scripts/python.exe -m pip install -r tools/calendar_host_requirements.txt
+```
+
+On Linux/macOS, use `.dev/calendar-tools/bin/python` for the second command.
+The downloaded feed is briefly stored in an ignored `.dev/calendar-feed-*.ics`
+file and removed after expansion. No private URL is passed on a command line.
+Host recurrence support does not change firmware's 48 KiB download limit or
+its recurrence limitations listed below.
 For a local Windows fixture, use a file URI such as
 `file:///C:/Users/you/Calendar/family.ics`; for Linux/macOS use
 `file:///home/you/family.ics` or the corresponding absolute path.
@@ -222,7 +242,7 @@ calendar layout function is called by the host and the embedded display
 adapter; on-device drawing still uses the existing `bb_epaper` buffer and
 `EPD_75` profile unchanged.
 
-Emulated: configuration edits/persistence, fixture or local-file provider
+Emulated: configuration edits/persistence, HTTPS, fixture or local-file provider
 flow, calendar date selection/layout, monochrome drawing, PNG output, and
 manual refresh/reload actions.
 

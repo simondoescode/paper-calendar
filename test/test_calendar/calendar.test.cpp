@@ -628,7 +628,7 @@ void test_weather_conditions_map_to_lucide_icons_with_cloud_fallback(void) {
 
 void test_host_provider_error_and_missing_configuration_are_clean(void) {
   calendar::CalendarSettings settings = calendar::defaultCalendarSettings();
-  strncpy(settings.calendarUrl, "https://calendar.example/family.ics", sizeof(settings.calendarUrl) - 1);
+  strncpy(settings.calendarUrl, "http://calendar.example/family.ics", sizeof(settings.calendarUrl) - 1);
   calendar::HostCalendarProvider remoteProvider(settings, {2026, 10, 1});
   calendar::CalendarEvent events[calendar::kMaxEvents] = {};
   TEST_ASSERT_EQUAL_UINT(0, remoteProvider.loadEvents(events, calendar::kMaxEvents));

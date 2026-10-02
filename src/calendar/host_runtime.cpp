@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,6 +33,8 @@
 #if defined(_WIN32)
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <windows.h>
+#include <winhttp.h>
 using HostSocket = SOCKET;
 static const HostSocket kInvalidSocket = INVALID_SOCKET;
 static void closeHostSocket(HostSocket socket) { closesocket(socket); }
@@ -40,6 +43,7 @@ static void closeHostSocket(HostSocket socket) { closesocket(socket); }
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <curl/curl.h>
 using HostSocket = int;
 static const HostSocket kInvalidSocket = -1;
 static void closeHostSocket(HostSocket socket) { close(socket); }
@@ -219,6 +223,133 @@ bool decodeFileUrlPath(const char *url, std::string &path) {
   return !path.empty();
 }
 
+struct FeedSink {
+  explicit FeedSink(std::string &value) : data(value) {}
+  std::string &data;
+  bool write(const uint8_t *data, size_t length) {
+    if (length > 2 * 1024 * 1024 - this->data.size()) return false;
+    this->data.append(reinterpret_cast<const char *>(data), length);
+    return true;
+  }
+};
+
+// Host-only transport. Never include the private URL in diagnostics.
+bool fetchHostFeed(const char *url, std::string &data, char *error, size_t errorSize) {
+  FeedSink sink{data};
+  snprintf(error, errorSize, "HTTPS connection failed.");
+#if defined(_WIN32)
+  struct Handle {
+    HINTERNET value;
+    ~Handle() { if (value) WinHttpCloseHandle(value); }
+  };
+  const int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, url, -1, nullptr, 0);
+  if (length == 0) return false;
+  std::vector<wchar_t> wide(length);
+  MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, url, -1, wide.data(), length);
+  URL_COMPONENTS parts = {};
+  parts.dwStructSize = sizeof(parts);
+  parts.dwHostNameLength = parts.dwUrlPathLength = parts.dwExtraInfoLength = static_cast<DWORD>(-1);
+  if (!WinHttpCrackUrl(wide.data(), 0, 0, &parts) || parts.nScheme != INTERNET_SCHEME_HTTPS) return false;
+  const std::wstring host(parts.lpszHostName, parts.dwHostNameLength);
+  std::wstring path(parts.lpszUrlPath, parts.dwUrlPathLength);
+  path.append(parts.lpszExtraInfo, parts.dwExtraInfoLength);
+  Handle session{WinHttpOpen(L"CalendarHost/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                            WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0)};
+  if (!session.value || !WinHttpSetTimeouts(session.value, kCalendarFeedTimeoutMs,
+      kCalendarFeedTimeoutMs, kCalendarFeedTimeoutMs, kCalendarFeedTimeoutMs)) return false;
+  Handle connection{WinHttpConnect(session.value, host.c_str(), parts.nPort, 0)};
+  if (!connection.value) return false;
+  Handle request{WinHttpOpenRequest(connection.value, L"GET", path.c_str(), nullptr,
+                                  WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE)};
+  DWORD redirectPolicy = WINHTTP_OPTION_REDIRECT_POLICY_NEVER;
+  if (!request.value || !WinHttpSetOption(request.value, WINHTTP_OPTION_REDIRECT_POLICY,
+      &redirectPolicy, sizeof(redirectPolicy)) ||
+      !WinHttpSendRequest(request.value, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
+                          WINHTTP_NO_REQUEST_DATA, 0, 0, 0) ||
+      !WinHttpReceiveResponse(request.value, nullptr)) return false;
+  DWORD status = 0, statusSize = sizeof(status);
+  if (!WinHttpQueryHeaders(request.value, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                          WINHTTP_HEADER_NAME_BY_INDEX, &status, &statusSize, WINHTTP_NO_HEADER_INDEX) ||
+      status != 200) {
+    snprintf(error, errorSize, "Calendar server returned HTTP %lu.", static_cast<unsigned long>(status));
+    return false;
+  }
+  const auto started = std::chrono::steady_clock::now();
+  uint8_t chunk[512];
+  for (;;) {
+    DWORD count = 0;
+    if (std::chrono::steady_clock::now() - started >= std::chrono::milliseconds(kCalendarFeedTimeoutMs) ||
+        !WinHttpReadData(request.value, chunk, sizeof(chunk), &count)) return false;
+    if (count == 0) return true;
+    if (!sink.write(chunk, count)) {
+      snprintf(error, errorSize, "Calendar feed exceeds host 2 MiB limit.");
+      return false;
+    }
+  }
+#else
+  static const bool initialized = curl_global_init(CURL_GLOBAL_DEFAULT) == CURLE_OK;
+  if (!initialized) return false;
+  CURL *request = curl_easy_init();
+  if (!request) return false;
+  curl_easy_setopt(request, CURLOPT_URL, url);
+  curl_easy_setopt(request, CURLOPT_FOLLOWLOCATION, 0L);
+  curl_easy_setopt(request, CURLOPT_NOSIGNAL, 1L);
+  curl_easy_setopt(request, CURLOPT_TIMEOUT_MS, static_cast<long>(kCalendarFeedTimeoutMs));
+  curl_easy_setopt(request, CURLOPT_WRITEFUNCTION,
+      +[](char *data, size_t size, size_t count, void *context) -> size_t {
+        const size_t length = size * count;
+        return static_cast<FeedSink *>(context)->write(reinterpret_cast<uint8_t *>(data), length) ? length : 0;
+      });
+  curl_easy_setopt(request, CURLOPT_WRITEDATA, &sink);
+  const CURLcode result = curl_easy_perform(request);
+  long status = 0;
+  curl_easy_getinfo(request, CURLINFO_RESPONSE_CODE, &status);
+  curl_easy_cleanup(request);
+  if (result != CURLE_OK) snprintf(error, errorSize, "HTTPS fetch failed (transport code %u).", static_cast<unsigned>(result));
+  else if (status != 200) snprintf(error, errorSize, "Calendar server returned HTTP %ld.", status);
+  return result == CURLE_OK && status == 200;
+#endif
+}
+
+bool normalizeHostFeed(const std::string &data, CalendarRange range, IcalendarParser &parser) {
+  // Private temporary feed is confined to ignored host state and removed on exit.
+  const std::string path = ".dev/calendar-feed-" + std::to_string(
+      std::chrono::steady_clock::now().time_since_epoch().count()) + ".ics";
+  struct Cleanup {
+    std::string path;
+    ~Cleanup() { remove(path.c_str()); }
+  } cleanup{path};
+  if (!ensureParentDirectory(path)) return false;
+  std::ofstream file(path, std::ios::binary);
+  file.write(data.data(), data.size());
+  file.close();
+  if (!file) return false;
+  char dates[48];
+  snprintf(dates, sizeof(dates), " %lld %lld", static_cast<long long>(range.startEpoch),
+           static_cast<long long>(range.endEpoch));
+#if defined(_WIN32)
+  const std::string command = ".dev\\calendar-tools\\Scripts\\python.exe tools/expand_host_calendar.py " + path + dates;
+  FILE *pipe = _popen(command.c_str(), "rb");
+#else
+  const std::string command = ".dev/calendar-tools/bin/python tools/expand_host_calendar.py " + path + dates;
+  FILE *pipe = popen(command.c_str(), "r");
+#endif
+  if (!pipe) return false;
+  uint8_t chunk[512];
+  bool valid = true;
+  size_t count;
+  while ((count = fread(chunk, 1, sizeof(chunk), pipe)) > 0) {
+    if (valid && !parser.write(chunk, count)) valid = false;
+  }
+  valid = valid && !ferror(pipe);
+#if defined(_WIN32)
+  const int status = _pclose(pipe);
+#else
+  const int status = pclose(pipe);
+#endif
+  return valid && status == 0;
+}
+
 } // namespace
 
 HostCalendarProvider::HostCalendarProvider(const CalendarSettings &settings, CalendarDate today)
@@ -238,8 +369,28 @@ size_t HostCalendarProvider::loadEvents(CalendarEvent *events, size_t capacity) 
     MockCalendarProvider fixture(_today);
     return fixture.loadEvents(events, capacity);
   }
+  if (strncmp(_settings.calendarUrl, "https://", 8) == 0) {
+    CalendarRange range = {calendarTodayRange(_today).startEpoch,
+                           calendarRestOfWeekRange(_today).endEpoch,
+                           _today, calendarRestOfWeekRange(_today).endDate};
+    IcalendarParser parser(range, events, capacity);
+    std::string data;
+    if (!fetchHostFeed(_settings.calendarUrl, data, _error, sizeof(_error))) {
+      return 0;
+    }
+    _error[0] = '\0';
+    if (!normalizeHostFeed(data, range, parser)) {
+      snprintf(_error, sizeof(_error), "Feed expansion failed: check host Python setup, feed validity, or 16-event week limit.");
+      return 0;
+    }
+    if (!parser.finish()) {
+      snprintf(_error, sizeof(_error), "iCalendar feed parser error %u.", static_cast<unsigned>(parser.error()));
+      return 0;
+    }
+    return parser.eventCount();
+  }
   if (strncmp(_settings.calendarUrl, "file://", 7) != 0) {
-    snprintf(_error, sizeof(_error), "Host source must be fixture://default or a local file:// .ics feed.");
+    snprintf(_error, sizeof(_error), "Use an HTTPS .ics feed, fixture://default, or a local file:// feed.");
     return 0;
   }
   std::string path;
@@ -498,7 +649,7 @@ struct HostPortal::Impl {
       "#status{white-space:pre-wrap}</style></head><body><h1>Calendar host emulator</h1>"
       "<p>Local settings are saved to <code>.dev/calendar-settings.json</code>. Fixture data works offline.</p>"
       "<form id=settings><label>Calendar URL</label><input name=calendar_url type=url value=\"" + url +
-      "\" required><small>Use fixture://default or a local file://... .ics feed. Remote HTTPS is not fetched by host mode.</small>"
+      "\" required><small>Use a private HTTPS .ics feed URL, fixture://default, or a local file://... .ics feed.</small>"
       "<label>Refresh interval (seconds)</label><input name=refresh_interval type=number min=60 max=604800 value=\"" +
       interval + "\" required><label>Timezone</label><input name=timezone value=\"" +
       escapeHtml(settings.timezone) +
