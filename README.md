@@ -20,6 +20,10 @@ The device connects directly to Wi-Fi, reads calendar data from a private HTTPS 
 - GitHub Releases OTA firmware updates
 - Desktop host preview for UI development without hardware
 
+## Hardware validation status
+
+`v0.1.0` is the first pre-hardware release. The firmware builds and host tests pass in CI, but the complete flow has not yet been validated on a physical TRMNL BYOD 7.5-inch OG DIY Kit. Treat this release as an early developer release until USB flashing, captive-portal setup, display refresh, deep sleep, KEY3 wake and OTA update have been exercised on-device.
+
 ## Hardware
 
 Primary supported target:
@@ -222,16 +226,16 @@ include/config.h
 Update:
 
 ```cpp
-#define FW_MAJOR_VERSION 1
-#define FW_MINOR_VERSION 8
-#define FW_PATCH_VERSION 17
+#define FW_MAJOR_VERSION 0
+#define FW_MINOR_VERSION 1
+#define FW_PATCH_VERSION 0
 ```
 
 Then create and push a matching tag:
 
 ```bash
-git tag v1.8.17
-git push origin v1.8.17
+git tag v0.1.0
+git push origin v0.1.0
 ```
 
 The `calendar-release` GitHub Actions workflow builds the real calendar target and publishes the OTA assets to GitHub Releases.
