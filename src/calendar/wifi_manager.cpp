@@ -65,4 +65,20 @@ namespace calendar {
     return true;
   }
 
+  void WifiManager::getWeatherLocation(double &latitude, double &longitude) const {
+    latitude = WEATHER_LATITUDE;
+    longitude = WEATHER_LONGITUDE;
+    Preferences prefs;
+    if (!prefs.begin("data", true)) {
+      return;
+    }
+    latitude = prefs.getDouble("weather_lat", latitude);
+    longitude = prefs.getDouble("weather_lon", longitude);
+    prefs.end();
+    if (latitude < -90.0 || latitude > 90.0 || longitude < -180.0 || longitude > 180.0) {
+      latitude = WEATHER_LATITUDE;
+      longitude = WEATHER_LONGITUDE;
+    }
+  }
+
 } // namespace calendar
