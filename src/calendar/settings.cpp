@@ -1,4 +1,7 @@
 #include <calendar/settings.h>
+#include <calendar/calendar_config.h>
+#include <math.h>
+#include <initializer_list>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -111,11 +114,19 @@ namespace calendar {
   CalendarSettings defaultCalendarSettings() {
     CalendarSettings settings = {};
     settings.refreshIntervalSeconds = kDefaultRefreshIntervalSeconds;
+    settings.weatherLatitude = WEATHER_LATITUDE;
+    settings.weatherLongitude = WEATHER_LONGITUDE;
     snprintf(settings.timezone, sizeof(settings.timezone), "%s", kDefaultCalendarTimezone);
     return settings;
   }
 
   bool validateCalendarSettings(const CalendarSettings &settings, char *error, size_t errorSize) {
+    if (!isfinite(settings.weatherLatitude) || !isfinite(settings.weatherLongitude) ||
+        settings.weatherLatitude < -90 || settings.weatherLatitude > 90 ||
+        settings.weatherLongitude < -180 || settings.weatherLongitude > 180) {
+      setError(error, errorSize, "Weather latitude must be between -90 and 90; longitude between -180 and 180.");
+      return false;
+    }
     if (settings.calendarUrl[0] != '\0' && !isValidFeedUrl(settings.calendarUrl)) {
       setError(error, errorSize, "Use fixture://default, a file:// URL, or an HTTPS .ics URL.");
       return false;
@@ -140,7 +151,7 @@ namespace calendar {
       setError(error, errorSize, "Missing form body.");
       return false;
     }
-    CalendarSettings submitted = {};
+    CalendarSettings submitted = settings;
     char interval[24];
     if (!copyFormField(body, "calendar_url", submitted.calendarUrl, sizeof(submitted.calendarUrl), true) ||
         !copyFormField(body, "refresh_interval", interval, sizeof(interval), true) ||
@@ -155,6 +166,27 @@ namespace calendar {
       return false;
     }
     submitted.refreshIntervalSeconds = static_cast<uint32_t>(parsedInterval);
+    for (const char *name : {"weather_latitude", "weather_longitude"}) {
+      char value[48];
+      if (!copyFormField(body, name, value, sizeof(value), false)) {
+        setError(error, errorSize, "Invalid weather coordinate.");
+        return false;
+      }
+      // Older callers omit these fields; preserve their configured location.
+      if (value[0] == '\0') {
+        if (strstr(body, name) == nullptr) continue;
+        setError(error, errorSize, "Enter both weather coordinates.");
+        return false;
+      }
+      char *coordinateEnd = nullptr;
+      const double coordinate = strtod(value, &coordinateEnd);
+      if (coordinateEnd == value || *coordinateEnd != '\0' || !isfinite(coordinate)) {
+        setError(error, errorSize, "Weather coordinates must be decimal numbers.");
+        return false;
+      }
+      if (strcmp(name, "weather_latitude") == 0) submitted.weatherLatitude = coordinate;
+      else submitted.weatherLongitude = coordinate;
+    }
     if (!validateCalendarSettings(submitted, error, errorSize)) {
       return false;
     }

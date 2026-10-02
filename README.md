@@ -263,6 +263,10 @@ Leave the terminal running and open [http://localhost:8080/](http://localhost:80
 in your browser to access the local setup portal. Settings and the display preview
 are written to `.dev/calendar-settings.json` and `.dev/calendar-preview.png`.
 
+The portal includes weather latitude and longitude fields in decimal degrees.
+These are saved locally; the host preview still uses offline demo weather and
+does not transfer settings to the device.
+
 Press **Ctrl+C** in the emulator terminal to stop it before rebuilding. On Windows,
 a running emulator locks `program.exe` and causes an `Access is denied` build error.
 

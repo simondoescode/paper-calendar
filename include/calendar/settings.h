@@ -15,6 +15,8 @@ namespace calendar {
     char calendarUrl[512];
     uint32_t refreshIntervalSeconds;
     char timezone[64];
+    double weatherLatitude;
+    double weatherLongitude;
   };
 
   class ConfigStore {

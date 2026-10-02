@@ -402,7 +402,8 @@ void test_host_settings_form_validates_and_persists_portal_submission(void) {
   std::unique_ptr<calendar::ConfigStore> store(calendar::createHostConfigStore(path));
   calendar::CalendarSettings settings = calendar::defaultCalendarSettings();
   char error[160];
-  const char form[] = "calendar_url=fixture%3A%2F%2Fdefault&refresh_interval=180&timezone=UTC";
+  const char form[] = "calendar_url=fixture%3A%2F%2Fdefault&refresh_interval=180&timezone=UTC"
+                      "&weather_latitude=-33.8688&weather_longitude=151.2093";
   TEST_ASSERT_TRUE(calendar::applySettingsForm(form, settings, error, sizeof(error)));
   TEST_ASSERT_TRUE(store->save(settings));
 
@@ -415,6 +416,15 @@ void test_host_settings_form_validates_and_persists_portal_submission(void) {
   TEST_ASSERT_TRUE(store->load(reloaded));
   TEST_ASSERT_EQUAL_UINT(180, reloaded.refreshIntervalSeconds);
   TEST_ASSERT_EQUAL_STRING("UTC", reloaded.timezone);
+  TEST_ASSERT_TRUE(reloaded.weatherLatitude > -33.868801 && reloaded.weatherLatitude < -33.868799);
+  TEST_ASSERT_TRUE(reloaded.weatherLongitude > 151.209299 && reloaded.weatherLongitude < 151.209301);
+  for (const char *coordinate : {"91", "nan", "abc", "", "12oops"}) {
+    char badForm[256];
+    snprintf(badForm, sizeof(badForm), "calendar_url=fixture://default&refresh_interval=180&timezone=UTC"
+                                     "&weather_latitude=%s&weather_longitude=0", coordinate);
+    TEST_ASSERT_FALSE(calendar::applySettingsForm(badForm, reloaded, error, sizeof(error)));
+    TEST_ASSERT_TRUE(reloaded.weatherLatitude > -33.868801 && reloaded.weatherLatitude < -33.868799);
+  }
   remove(path);
 }
 

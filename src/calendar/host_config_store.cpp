@@ -3,6 +3,8 @@
 #if defined(CALENDAR_HOST)
 
 #include <errno.h>
+#include <stdlib.h>
+#include <iomanip>
 #include <fstream>
 #include <iterator>
 #include <stdio.h>
@@ -17,6 +19,20 @@
 
 namespace calendar {
   namespace {
+
+    bool extractCoordinate(const std::string &json, const char *key, double &output) {
+      const std::string token = std::string("\"") + key + "\":";
+      const size_t position = json.find(token);
+      if (position == std::string::npos) return true; // Existing settings retain defaults.
+      const char *start = json.c_str() + position + token.size();
+      char *end = nullptr;
+      const double value = strtod(start, &end);
+      if (end == start) return false;
+      while (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n') ++end;
+      if (*end != ',' && *end != '}') return false;
+      output = value;
+      return true;
+    }
 
     bool extractString(const std::string &json, const char *key, char *output, size_t outputSize) {
       const std::string token = std::string("\"") + key + "\":";
@@ -153,10 +169,12 @@ namespace calendar {
       }
       file.seekg(0, std::ios::beg);
       const std::string json((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-      CalendarSettings loaded = {};
+      CalendarSettings loaded = defaultCalendarSettings();
       if (!extractString(json, "calendarUrl", loaded.calendarUrl, sizeof(loaded.calendarUrl)) ||
           !extractUnsigned(json, "refreshIntervalSeconds", loaded.refreshIntervalSeconds) ||
           !extractString(json, "timezone", loaded.timezone, sizeof(loaded.timezone)) ||
+          !extractCoordinate(json, "weatherLatitude", loaded.weatherLatitude) ||
+          !extractCoordinate(json, "weatherLongitude", loaded.weatherLongitude) ||
           !validateCalendarSettings(loaded, nullptr, 0)) {
         return false;
       }
@@ -183,6 +201,8 @@ namespace calendar {
       writeJsonString(file, settings.calendarUrl);
       file << ",\n  \"refreshIntervalSeconds\": " << settings.refreshIntervalSeconds << ",\n  \"timezone\": ";
       writeJsonString(file, settings.timezone);
+      file << std::setprecision(17) << ",\n  \"weatherLatitude\": " << settings.weatherLatitude
+           << ",\n  \"weatherLongitude\": " << settings.weatherLongitude;
       file << "\n}\n";
       return file.good();
     }

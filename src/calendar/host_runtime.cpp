@@ -679,6 +679,9 @@ namespace calendar {
       }
       std::string url = escapeHtml(settings.calendarUrl);
       char interval[24];
+      char latitude[48], longitude[48];
+      snprintf(latitude, sizeof(latitude), "%.6f", settings.weatherLatitude);
+      snprintf(longitude, sizeof(longitude), "%.6f", settings.weatherLongitude);
       snprintf(interval, sizeof(interval), "%lu", static_cast<unsigned long>(settings.refreshIntervalSeconds));
       return std::string(
         "<!doctype html><html><head><meta charset=utf-8><meta name=viewport content='width=device-width'>"
@@ -694,7 +697,13 @@ namespace calendar {
         "feed.</small>"
         "<label>Refresh interval (seconds)</label><input name=refresh_interval type=number min=60 max=604800 value=\"" +
         interval + "\" required><label>Timezone</label><input name=timezone value=\"" + escapeHtml(settings.timezone) +
-        "\" required><button>Save settings</button></form><button id=refresh>Refresh now</button>"
+        "\" required><h2>Weather location</h2><label>Latitude</label>"
+        "<input name=weather_latitude type=number min=-90 max=90 step=any value=\"" + std::string(latitude) +
+        "\" required><label>Longitude</label>"
+        "<input name=weather_longitude type=number min=-180 max=180 step=any value=\"" + std::string(longitude) +
+        "\" required><p>Enter decimal coordinates. The host preview uses offline demo weather; "
+        "these settings do not change its forecast or the physical device.</p>"
+        "<button>Save settings</button></form><button id=refresh>Refresh now</button>"
         "<button id=reload>Reload settings and render</button><p id=status></p><h2>800 × 480 preview</h2>"
         "<img id=preview src='/preview.png' alt='Calendar display preview'>"
         "<script>const status=document.querySelector('#status');function updatePreview(){"
