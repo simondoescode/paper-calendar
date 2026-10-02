@@ -1,0 +1,35 @@
+name: calendar-ci
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  calendar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+          key: ${{ runner.os }}-calendar-ci-${{ hashFiles('platformio.ini') }}
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install PlatformIO
+        run: pip install --upgrade platformio==6.1.19
+
+      - name: Build Paper Calendar firmware
+        run: python scripts/platformio_cli.py run -e TRMNL_7inch5_OG_DIY_Kit
+
+      - name: Run calendar host tests
+        run: python scripts/platformio_cli.py test -e native_calendar -v
