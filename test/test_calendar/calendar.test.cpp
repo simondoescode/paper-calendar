@@ -199,6 +199,14 @@ void test_mock_events_are_generated_relative_to_injected_date(void) {
   TEST_ASSERT_EQUAL_UINT(31, events[7].allDayStartDate.day);
 }
 
+void test_display_palette_uses_four_native_grayscale_samples(void) {
+  TEST_ASSERT_EQUAL_UINT8(0, static_cast<uint8_t>(calendar::DisplayColor::Black));
+  TEST_ASSERT_EQUAL_UINT8(1, static_cast<uint8_t>(calendar::DisplayColor::DarkGrey));
+  TEST_ASSERT_EQUAL_UINT8(2, static_cast<uint8_t>(calendar::DisplayColor::LightGrey));
+  TEST_ASSERT_EQUAL_UINT8(3, static_cast<uint8_t>(calendar::DisplayColor::White));
+  TEST_ASSERT_TRUE(calendar::CalendarColors::Sidebar == calendar::DisplayColor::LightGrey);
+}
+
 void test_display_state_hash_is_stable_and_tracks_visible_content(void) {
   const calendar::CalendarDate date = {2026, 10, 1};
   const int64_t today = calendar::localDateTimeEpoch(date);
@@ -610,7 +618,7 @@ void test_host_fixture_provider_renders_shared_800_by_480_png(void) {
                                 (static_cast<uint32_t>(header[18]) << 8) | header[19]);
   TEST_ASSERT_EQUAL_UINT(480, (static_cast<uint32_t>(header[20]) << 24) | (static_cast<uint32_t>(header[21]) << 16) |
                                 (static_cast<uint32_t>(header[22]) << 8) | header[23]);
-  TEST_ASSERT_EQUAL_UINT8(1, header[24]);
+  TEST_ASSERT_EQUAL_UINT8(2, header[24]);
   file.close();
   remove(path);
 }
@@ -733,7 +741,7 @@ void test_today_groups_all_day_cards_and_preserves_text_backgrounds() {
                    calendar::DisplayColor border) override {
       if (x == 16 && (h == 72 || h == 48)) {
         TEST_ASSERT_EQUAL_UINT(fills.empty() ? 128 : cardY + cardHeight + 10, y);
-        TEST_ASSERT_EQUAL_UINT(fill == calendar::CalendarPatterns::Sidebar ? 48 : 72, h);
+        TEST_ASSERT_EQUAL_UINT(fill == calendar::CalendarColors::Sidebar ? 48 : 72, h);
         cardY = y;
         cardHeight = h;
         TEST_ASSERT_EQUAL_UINT(calendar::CalendarColors::Border, border);
@@ -798,7 +806,7 @@ void test_today_groups_all_day_cards_and_preserves_text_backgrounds() {
   TEST_ASSERT_EQUAL_UINT(4, display.fills.size());
   for (size_t i = 0; i < 4; ++i) {
     TEST_ASSERT_EQUAL_STRING(expected[i], display.titles[i].c_str());
-    TEST_ASSERT_EQUAL_UINT(i < 3 ? calendar::CalendarPatterns::Sidebar : calendar::CalendarColors::Background,
+    TEST_ASSERT_EQUAL_UINT(i < 3 ? calendar::CalendarColors::Sidebar : calendar::CalendarColors::Background,
                            display.fills[i]);
     if (i < 3) TEST_ASSERT_EQUAL_STRING("ALL DAY", display.times[i].c_str());
   }
@@ -815,7 +823,7 @@ void test_today_groups_all_day_cards_and_preserves_text_backgrounds() {
   const char *singleDayExpected[] = {"multi-day", "overnight", "late", "morning"};
   for (size_t i = 0; i < 4; ++i) {
     TEST_ASSERT_EQUAL_STRING(singleDayExpected[i], display.titles[i].c_str());
-    TEST_ASSERT_EQUAL_UINT(i == 0 ? calendar::CalendarPatterns::Sidebar : calendar::CalendarColors::Background,
+    TEST_ASSERT_EQUAL_UINT(i == 0 ? calendar::CalendarColors::Sidebar : calendar::CalendarColors::Background,
                            display.fills[i]);
   }
   TEST_ASSERT_EQUAL_STRING("ALL DAY", display.times[0].c_str());
@@ -917,6 +925,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_month_year_and_leap_day_boundaries);
   RUN_TEST(test_london_timezone_uses_bst_and_gmt_transition_rules);
   RUN_TEST(test_mock_events_are_generated_relative_to_injected_date);
+  RUN_TEST(test_display_palette_uses_four_native_grayscale_samples);
   RUN_TEST(test_display_state_hash_is_stable_and_tracks_visible_content);
   RUN_TEST(test_wake_reason_classifies_manual_timer_and_cold_boot);
   RUN_TEST(test_manual_refresh_reloads_events_without_forcing_unchanged_redraw);
