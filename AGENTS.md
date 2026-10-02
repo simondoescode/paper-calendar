@@ -30,8 +30,20 @@ hardware, persistence, networking, and host-emulator adapters.
 
 ## Build and test
 
-Run commands from the repository root. Prefer the narrowest relevant check;
-when changing shared calendar or device integration, run:
+Run commands from the repository root. Before committing any changed C/C++
+source or header files, run the shared formatter:
+
+```sh
+python scripts/format_changed.py
+python scripts/format_changed.py --check
+```
+
+The repository root `.clang-format` file is the formatting source of truth.
+CI uses clang-format 22.1.0. Do not manually approximate formatter output or
+finish a PR with known formatting violations.
+
+Prefer the narrowest relevant check; when changing shared calendar or device
+integration, run:
 
 ```sh
 python scripts/platformio_cli.py test -e native_calendar -f test_calendar
