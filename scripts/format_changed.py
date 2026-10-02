@@ -26,7 +26,10 @@ def changed_files(base: str | None, head: str) -> list[Path]:
     files: set[str] = set()
 
     if base:
-        files.update(git_lines("diff", "--name-only", "--diff-filter=ACMR", base, head))
+        if "..." in base:
+            files.update(git_lines("diff", "--name-only", "--diff-filter=ACMR", base))
+        else:
+            files.update(git_lines("diff", "--name-only", "--diff-filter=ACMR", base, head))
     else:
         files.update(git_lines("diff", "--name-only", "--diff-filter=ACMR", "HEAD"))
         files.update(git_lines("diff", "--cached", "--name-only", "--diff-filter=ACMR", "HEAD"))
