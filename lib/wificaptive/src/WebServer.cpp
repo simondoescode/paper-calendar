@@ -108,9 +108,14 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
     String apiUrl = prefs.getString("api_url", "");
 #ifdef EINK_CALENDAR_APP
     const bool configured = apiUrl.length() > 0;
+    const double weatherLatitude = prefs.getDouble("weather_lat", WEATHER_LATITUDE);
+    const double weatherLongitude = prefs.getDouble("weather_lon", WEATHER_LONGITUDE);
     prefs.end();
-    request->send(200, "application/json",
-                  String("{\"calendar_mode\":true,\"calendar_feed_configured\":") + (configured ? "true}" : "false}"));
+    String response = String("{\"calendar_mode\":true,\"calendar_feed_configured\":") +
+                      (configured ? "true" : "false") +
+                      ",\"weather_latitude\":" + String(weatherLatitude, 6) +
+                      ",\"weather_longitude\":" + String(weatherLongitude, 6) + "}";
+    request->send(200, "application/json", response);
 #else
     prefs.end();
     apiUrl.replace("\\", "\\\\");
@@ -215,6 +220,25 @@ void setUpWebserver(AsyncWebServer &server, const IPAddress &localIP, WifiOperat
         }
         api_server = prefs.getString("api_url", "");
         prefs.end();
+      }
+
+      if (data["weatherLatitude"].is<double>() && data["weatherLongitude"].is<double>()) {
+        const double weatherLatitude = data["weatherLatitude"].as<double>();
+        const double weatherLongitude = data["weatherLongitude"].as<double>();
+        if (weatherLatitude < -90.0 || weatherLatitude > 90.0 || weatherLongitude < -180.0 ||
+            weatherLongitude > 180.0) {
+          request->send(400, "application/json", "{\"error\":\"Weather coordinates are out of range\"}");
+          return;
+        }
+        Preferences prefs;
+        if (!prefs.begin("data", false)) {
+          request->send(500, "application/json", "{\"error\":\"Weather settings unavailable\"}");
+          return;
+        }
+        prefs.putDouble("weather_lat", weatherLatitude);
+        prefs.putDouble("weather_lon", weatherLongitude);
+        prefs.end();
+        Log_info("WebServer: Saved weather location: %.6f, %.6f", weatherLatitude, weatherLongitude);
       }
 #endif
       bool isEnterprise = data["isEnterprise"].is<bool>() && data["isEnterprise"].as<bool>();
