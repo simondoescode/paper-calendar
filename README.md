@@ -250,6 +250,22 @@ Build it with:
 pio run -e calendar-host
 ```
 
+On Windows PowerShell, build and start the emulator from the repository root:
+
+```powershell
+.\scripts\pio.cmd run -e calendar-host
+.\.pio\build\calendar-host\program.exe
+```
+
+On Linux/macOS, start it with `.pio/build/calendar-host/program` after building.
+
+Leave the terminal running and open [http://localhost:8080/](http://localhost:8080/)
+in your browser to access the local setup portal. Settings and the display preview
+are written to `.dev/calendar-settings.json` and `.dev/calendar-preview.png`.
+
+Press **Ctrl+C** in the emulator terminal to stop it before rebuilding. On Windows,
+a running emulator locks `program.exe` and causes an `Access is denied` build error.
+
 This can render an 800×480 desktop preview so layout changes can be developed before the physical display arrives.
 
 The host implementation also supports local configuration and calendar-feed development.
