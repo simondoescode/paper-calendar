@@ -33,9 +33,9 @@
 #include <vector>
 
 #if defined(_WIN32)
-#include <winsock2.h>
 #include <windows.h>
 #include <winhttp.h>
+#include <winsock2.h>
 #include <ws2tcpip.h>
 using HostSocket = SOCKET;
 static const HostSocket kInvalidSocket = INVALID_SOCKET;
@@ -713,8 +713,8 @@ namespace calendar {
         "<label>Refresh interval (seconds)</label><input name=refresh_interval type=number min=60 max=604800 value=\"" +
         interval + "\" required><label>Timezone</label><input name=timezone value=\"" + escapeHtml(settings.timezone) +
         "\" required><h2>Weather location</h2><label>Latitude</label>"
-        "<input name=weather_latitude type=number min=-90 max=90 step=any value=\"" +
-        std::string(latitude) + "\" required><label>Longitude</label>"
+        "<input name=weather_latitude type=number min=-90 max=90 step=any value=\"" + std::string(latitude) +
+        "\" required><label>Longitude</label>"
         "<input name=weather_longitude type=number min=-180 max=180 step=any value=\"" +
         std::string(longitude) +
         "\" required><p>Enter decimal coordinates for live Open-Meteo weather. "
